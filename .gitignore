@@ -1,0 +1,12 @@
+# Kuro Games assets: personal use only, never commit or distribute
+data/
+
+# Tooling
+node_modules/
+dist/
+.wxt/
+.DS_Store
+# In-game reference screenshots (personal, not committed)
+reference/
+# Erza source models (game assets): personal use only, never commit or distribute
+Erza Scarlet*/

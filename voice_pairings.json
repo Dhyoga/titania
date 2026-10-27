@@ -1,0 +1,51 @@
+{
+  "_comment": "Board action -> huaxu line title, per frame (slug). Read by build_voices.py. Titles are exactly as the frame's huaxu voices page spells them. A clip with no line yet (Veritas BoardAct0202/0203, Crepuscule BoardAct0204/0205) has no entry. crepuscule is only used to check the builder (build_voices.py --check crepuscule); its shipped data/crepuscule/voices.json is never regenerated.",
+  "crepuscule": {
+    "BoardAct0201": "General Greeting 12",
+    "BoardAct0202": "General Greeting 6",
+    "BoardAct0203": "General Greeting 14",
+    "BoardAct1001": "Affection Up 14",
+    "BoardAct1002": "Quick Tap 3",
+    "BoardAct1003": "Shake 3",
+    "BoardAct1004": "Connection Made 7",
+    "BoardAct1005": "Idle 5",
+    "BoardAct1006": "Extended Offline Time",
+    "BoardAct1007": "Extended Connection 5"
+  },
+  "stigmata": {
+    "BoardAct0201": "General Greeting 6",
+    "BoardAct0202": "General Greeting 12",
+    "BoardAct0203": "General Greeting 14",
+    "BoardAct1001": "Affection Up 13",
+    "BoardAct1002": "Quick Tap 1",
+    "BoardAct1003": "Shake 3",
+    "BoardAct1004": "Connection Made 6",
+    "BoardAct1005": "Idle 4",
+    "BoardAct1006": "Extended Offline Time",
+    "BoardAct1007": "Extended Connection 2",
+    "BoardAct10021": "General Greeting 16",
+    "BoardAct10022": "Connection Made 9"
+  },
+  "veritas": {
+    "BoardAct0201": "General Greeting 2",
+    "BoardAct1001": "Affection Up 2",
+    "BoardAct1002": "Quick Tap 4",
+    "BoardAct1003": "Shake 4",
+    "BoardAct1004": "Connection Made 4",
+    "BoardAct1005": "Idle 3",
+    "BoardAct1006": "Extended Offline Time 1",
+    "BoardAct1007": "Extended Connection 2"
+  },
+  "zero": {
+    "BoardAct0201": "General Greeting 4",
+    "BoardAct0202": "General Greeting 5",
+    "BoardAct0203": "General Greeting 2",
+    "BoardAct1001": "Affection Up 1",
+    "BoardAct1002": "Quick Tap 4",
+    "BoardAct1003": "Shake 2",
+    "BoardAct1004": "Connection Made 1",
+    "BoardAct1005": "Idle 1",
+    "BoardAct1006": "Extended Offline Time 1",
+    "BoardAct1007": "Excessive Online Time 4"
+  }
+}
