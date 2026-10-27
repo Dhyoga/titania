@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { buildCatalog, hiddenNodesFor, naturalCompare, ownItemId, resolveFightIdle, withSources, type AnimationSource } from '../lib/anim/catalog.ts'
 import { FRAMES } from '../lib/constructs/index.ts'
@@ -166,36 +166,47 @@ test('hiddenNodesFor: stateHides of the clip in Menu, else the context list', ()
   assert.deepEqual(hiddenNodesFor(m, 'fight', null), [9])
 })
 
-// Real data: the shipped default skin. Skipped when data/ is absent.
-const manifestUrl = new URL('../data/crepuscule/anim/manifest.json', import.meta.url)
-const skip = !existsSync(manifestUrl) && 'data/crepuscule is not present'
+// Real data: Shukra's and Pavo's Generic clip sets. Skipped when data/ is absent.
+const manifestUrl = (frame: string) => new URL(`../data/${frame}/anim/manifest.json`, import.meta.url)
+const skip = !FRAMES.every((f) => existsSync(manifestUrl(f.id))) && 'data/ is not present'
+const manifestOf = (frame: string) => parseManifest(JSON.parse(readFileSync(manifestUrl(frame), 'utf8')))
 
-test('default skin: Menu list equals huaxu (12 items, in order)', { skip }, () => {
-  const m = parseManifest(JSON.parse(readFileSync(manifestUrl, 'utf8')))
-  const catalog = buildCatalog(m, 'menu')
-  assert.deepEqual(labels(m, 'menu'), [
-    ['Idle', ['StandAct0101', 'UiStand1']],
-    ['Board actions', ['BoardAct0201', 'BoardAct0202', 'BoardAct0203', 'BoardAct1001', 'BoardAct1002', 'BoardAct1003', 'BoardAct1004', 'BoardAct1005', 'BoardAct1006', 'BoardAct1007']],
-  ])
-  assert.equal(m.clips[catalog.defaultClip]!.name, 'UiStand1')
-  const loops = Object.fromEntries(catalog.groups.flatMap((g) => g.items).map((i) => [i.name, i.loop]))
-  assert.equal(loops.UiStand1, true)
-  assert.equal(loops.BoardAct0201, false)
+const BOARD = ['BoardAct0201', 'BoardAct0202', 'BoardAct0203', 'BoardAct1001', 'BoardAct1002', 'BoardAct1003', 'BoardAct1004', 'BoardAct1005', 'BoardAct1006', 'BoardAct1007']
+
+test('Menu lists: Idle and the ten Board actions, UiStand1 is the default and loops', { skip }, () => {
+  for (const frame of ['shukra', 'pavo']) {
+    const m = manifestOf(frame)
+    const catalog = buildCatalog(m, 'menu')
+    assert.deepEqual(labels(m, 'menu'), [['Idle', ['StandAct0101', 'UiStand1']], ['Board actions', BOARD]], frame)
+    assert.equal(m.clips[catalog.defaultClip]!.name, 'UiStand1', frame)
+    const loops = Object.fromEntries(catalog.groups.flatMap((g) => g.items).map((i) => [i.name, i.loop]))
+    assert.equal(loops.UiStand1, true, frame)
+    assert.equal(loops.BoardAct0201, false, frame)
+  }
 })
 
-test('default skin: the Fight list is cut down to idles, one Walk, Run and four level clips', { skip }, () => {
-  const m = parseManifest(JSON.parse(readFileSync(manifestUrl, 'utf8')))
-  const catalog = buildCatalog(m, 'fight')
-  const items = catalog.groups.flatMap((g) => g.items)
-  assert.equal(items.length, 12)
-  assert.equal(new Set(items.map((i) => i.label)).size, 12, 'labels are unique within the list')
-  assert.equal(m.clips[catalog.defaultClip]!.name, 'Stand1')
-  assert.deepEqual(labels(m, 'fight'), [
+test('Fight lists are cut down to idles, Run and Walk, Pavo\'s one level skill and the Other clips', { skip }, () => {
+  const shukra = manifestOf('shukra')
+  assert.deepEqual(labels(shukra, 'fight'), [
     ['Idle', ['Stand1', 'Stand2', 'Standchange']],
-    ['Movement', ['Run', 'Walk']], // the LevelCombine1Level1 Walk is the same motion
-    ['Level skills', ['LevelAttack08_NunWalk', 'LevelAttack11_Loop', 'LevelAttack013Loop', 'LevelAttack14']],
+    ['Movement', ['Run', 'Walk']],
     ['Other', ['Born', 'Save', 'Win']],
   ])
+  const pavo = manifestOf('pavo')
+  assert.deepEqual(labels(pavo, 'fight'), [
+    ['Idle', ['Stand1', 'Stand2', 'Standchange']],
+    ['Movement', ['Run', 'Walk']], // Pavo has Walk in more than one folder: the base layer one is listed
+    ['Level skills', ['LevelAttack14']],
+    ['Other', ['Born', 'Executioner01', 'Executioner02', 'Executioner03', 'Executioner04', 'Executioner05', 'Save', 'Win']],
+  ])
+  for (const [frame, m, count] of [['shukra', shukra, 8], ['pavo', pavo, 14]] as const) {
+    const catalog = buildCatalog(m, 'fight')
+    const items = catalog.groups.flatMap((g) => g.items)
+    assert.equal(items.length, count, frame)
+    assert.equal(new Set(items.map((i) => i.label)).size, count, `${frame}: labels are unique within the list`)
+    assert.ok(items.every((i) => !/\((Layer\d|LevelCombine)/.test(i.label)), `${frame}: no layer labels`)
+    assert.equal(m.clips[catalog.defaultClip]!.name, 'Stand1', frame)
+  }
 })
 
 test('fight: Squat* is hidden and layer variants of a name give way to the base layer', () => {
@@ -228,66 +239,27 @@ test('fight: Squat* is hidden and layer variants of a name give way to the base 
   ])
 })
 
-test('Stigmata, Veritas and Zero: Fight lists follow the same cut (base layer only, Run, Walk where it exists, no Squat)', { skip: !existsSync(new URL('../data/stigmata/anim/manifest.json', import.meta.url)) && 'data/ is not present' }, () => {
-  const frames: [string, string[], string[]][] = [
-    ['stigmata', ['Run', 'Walk'], ['Born', 'Save', 'Win']],
-    ['veritas', ['Run'], ['Born', 'Save', 'Win']],
-    ['zero', ['Run'], ['Born', 'Save', 'Win']],
-  ]
-  for (const [frame, movement, other] of frames) {
-    const m = parseManifest(JSON.parse(readFileSync(new URL(`../data/${frame}/anim/manifest.json`, import.meta.url), 'utf8')))
-    assert.deepEqual(labels(m, 'fight'), [
-      ['Idle', ['Stand1', 'Stand2', 'Standchange']],
-      ['Movement', movement],
-      ['Other', other],
-    ], frame)
-    const items = buildCatalog(m, 'fight').groups.flatMap((g) => g.items)
-    assert.ok(items.every((i) => !/\((Layer\d|LevelCombine)/.test(i.label)), `${frame}: no layer labels`)
-    assert.equal(m.clips[buildCatalog(m, 'fight').defaultClip]!.name, 'Stand1', frame)
-  }
-})
-
-test('Stigmata, Veritas and Zero: Menu lists are Idle and the ten Board actions; Solitary Dream adds two', { skip: !existsSync(new URL('../data/stigmata/anim/manifest.json', import.meta.url)) && 'data/ is not present' }, () => {
-  const board = ['BoardAct0201', 'BoardAct0202', 'BoardAct0203', 'BoardAct1001', 'BoardAct1002', 'BoardAct1003', 'BoardAct1004', 'BoardAct1005', 'BoardAct1006', 'BoardAct1007']
-  for (const frame of ['stigmata', 'veritas', 'zero']) {
-    const m = parseManifest(JSON.parse(readFileSync(new URL(`../data/${frame}/anim/manifest.json`, import.meta.url), 'utf8')))
-    assert.deepEqual(labels(m, 'menu'), [['Idle', ['StandAct0101', 'UiStand1']], ['Board actions', board]], frame)
-    assert.equal(m.clips[buildCatalog(m, 'menu').defaultClip]!.name, 'UiStand1', frame)
-  }
-  const sd = parseManifest(JSON.parse(readFileSync(new URL('../data/stigmata/anim-skins/r4biankamd019241/manifest.json', import.meta.url), 'utf8')))
-  const sdBoard = labels(sd, 'menu')[1]![1]
-  assert.equal(sdBoard.length, 12)
-  assert.ok(sdBoard.includes('BoardAct10021') && sdBoard.includes('BoardAct10022'))
-  assert.deepEqual(sdBoard.filter((n) => board.includes(n)), board, 'the ten usual Board actions are all there')
-})
-
-test('every skin: no attacks or reactions, movement is Walk and Run, level skills are the four kept', { skip }, () => {
-  const root = new URL('../data/crepuscule/', import.meta.url)
-  const manifests = ['anim', ...readdirSync(new URL('anim-skins/', root))].map((d) => new URL(d === 'anim' ? 'anim/manifest.json' : `anim-skins/${d}/manifest.json`, root))
-  assert.equal(manifests.length, 6)
-  for (const url of manifests) {
-    const m = parseManifest(JSON.parse(readFileSync(url, 'utf8')))
-    const groups = buildCatalog(m, 'fight').groups
-    assert.ok(groups.every((g) => g.label !== 'Attacks' && g.label !== 'Reactions'), url.pathname)
+test('both frames: no attacks or reactions, movement is Walk and Run, level skills are among the four kept', { skip }, () => {
+  for (const frame of ['shukra', 'pavo']) {
+    const groups = buildCatalog(manifestOf(frame), 'fight').groups
+    assert.ok(groups.every((g) => g.label !== 'Attacks' && g.label !== 'Reactions'), frame)
     const names = (label: string) => new Set(groups.find((g) => g.label === label)?.items.map((i) => i.name))
-    assert.ok([...names('Movement')].every((n) => n === 'Walk' || n === 'Run'), url.pathname)
-    assert.ok([...names('Level skills')].every((n) => ['LevelAttack08_NunWalk', 'LevelAttack11_Loop', 'LevelAttack013Loop', 'LevelAttack14'].includes(n)), url.pathname)
-    assert.ok(names('Movement').has('Walk') && names('Movement').has('Run'), url.pathname)
+    assert.deepEqual([...names('Movement')].sort(), ['Run', 'Walk'], frame)
+    assert.ok([...names('Level skills')].every((n) => ['LevelAttack08_NunWalk', 'LevelAttack11_Loop', 'LevelAttack013Loop', 'LevelAttack14'].includes(n)), frame)
   }
 })
 
-test('default skin: node visibility rules per context and clip', { skip }, () => {
-  const m = parseManifest(JSON.parse(readFileSync(manifestUrl, 'utf8')))
-  assert.deepEqual(hiddenNodesFor(m, 'menu', 'UiStand1'), [392, 394, 395, 396])
-  assert.deepEqual(hiddenNodesFor(m, 'menu', 'BoardAct0201'), [2, 4, 392, 393, 396])
-  assert.deepEqual(hiddenNodesFor(m, 'menu', 'StandAct0101'), [2, 4, 392, 393, 396])
-  assert.deepEqual(hiddenNodesFor(m, 'fight', 'Stand1'), [3, 391, 392, 394, 395, 396])
+test('node visibility: Qu\'s models hide nothing, in any context or clip', { skip }, () => {
+  for (const frame of ['shukra', 'pavo']) {
+    const m = manifestOf(frame)
+    assert.deepEqual(hiddenNodesFor(m, 'menu', 'UiStand1'), [], frame)
+    assert.deepEqual(hiddenNodesFor(m, 'menu', 'BoardAct0201'), [], frame)
+    assert.deepEqual(hiddenNodesFor(m, 'menu', 'StandAct0101'), [], frame)
+    assert.deepEqual(hiddenNodesFor(m, 'fight', 'Stand1'), [], frame)
+  }
 })
 
 // ---------------------------------------------------------------- lending frames (add-cross-frame-animation)
-
-
-const haveFrames = existsSync(new URL('../data/stigmata/anim/manifest.json', import.meta.url))
 
 function sourcesFor(shown: string): AnimationSource[] {
   return FRAMES.filter((f) => f.id !== shown).map((f) => sourceOf(f.id))
@@ -306,72 +278,94 @@ function sourceOf(id: string): AnimationSource {
   })[0]!
 }
 
-test('lending frames: Crepuscule\'s Menu list adds Stigmata, Veritas and Zero, Solitary Dream\'s two Board actions included', { skip: !haveFrames && 'data/ is not present' }, () => {
-  const own = parseManifest(JSON.parse(readFileSync(manifestUrl, 'utf8')))
-  const catalog = withSources(buildCatalog(own, 'menu'), sourcesFor('crepuscule'), 'menu')
-  assert.deepEqual(catalog.groups.map((g) => g.label), ['Idle', 'Board actions', 'Stigmata · Idle', 'Stigmata · Board actions', 'Veritas · Idle', 'Veritas · Board actions', 'Zero · Idle', 'Zero · Board actions'])
+test('lending frames: Shukra\'s Menu list adds Pavo\'s Idle and ten Board actions', { skip }, () => {
+  const own = manifestOf('shukra')
+  const catalog = withSources(buildCatalog(own, 'menu'), sourcesFor('shukra'), 'menu')
+  assert.deepEqual(catalog.groups.map((g) => g.label), ['Idle', 'Board actions', 'Pavo · Idle', 'Pavo · Board actions'])
   const group = (label: string) => catalog.groups.find((g) => g.label === label)!.items
-  assert.deepEqual(group('Stigmata · Idle').map((i) => i.label), ['StandAct0101', 'UiStand1'])
-  const stigmataBoard = group('Stigmata · Board actions')
-  assert.equal(stigmataBoard.length, 12)
-  const sd = stigmataBoard.filter((i) => i.name === 'BoardAct10021' || i.name === 'BoardAct10022')
-  assert.deepEqual(sd.map((i) => i.source?.manifestPath), ['anim-skins/r4biankamd019241/manifest.json', 'anim-skins/r4biankamd019241/manifest.json'])
-  assert.equal(stigmataBoard.find((i) => i.name === 'BoardAct0201')!.source!.manifestPath, 'anim/manifest.json')
-  assert.equal(group('Zero · Board actions').length, 10)
+  assert.deepEqual(group('Pavo · Idle').map((i) => i.label), ['StandAct0101', 'UiStand1'])
+  assert.deepEqual(group('Pavo · Board actions').map((i) => i.name), BOARD)
+  assert.ok(group('Pavo · Board actions').every((i) => i.source?.frame === 'pavo' && i.source.manifestPath === 'anim/manifest.json'))
   const all = catalog.groups.flatMap((g) => g.items)
-  assert.equal(new Set(all.map((i) => i.id)).size, all.length, 'item ids are unique')
+  assert.equal(new Set(all.map((i) => i.id)).size, all.length, 'item ids are unique although both frames have the same names')
   assert.equal(group('Board actions')[0]!.id, ownItemId(group('Board actions')[0]!.clip))
   assert.equal(group('Board actions')[0]!.source, null)
-  assert.equal(group('Veritas · Board actions')[0]!.fieldLabel, 'Veritas · BoardAct0201')
+  assert.equal(group('Pavo · Board actions')[0]!.fieldLabel, 'Pavo · BoardAct0201')
   assert.equal(catalog.defaultClip, buildCatalog(own, 'menu').defaultClip, 'the default stays the shown frame\'s idle clip')
 })
 
-test('lending frames: Veritas\' Fight list offers Crepuscule\'s four level skills; the cut-down rules apply to lent clips', { skip: !haveFrames && 'data/ is not present' }, () => {
-  const own = parseManifest(JSON.parse(readFileSync(new URL('../data/veritas/anim/manifest.json', import.meta.url), 'utf8')))
-  const catalog = withSources(buildCatalog(own, 'fight'), sourcesFor('veritas'), 'fight')
-  const group = (label: string) => catalog.groups.find((g) => g.label === label)?.items.map((i) => i.label)
-  assert.deepEqual(group('Crepuscule · Level skills'), ['LevelAttack08_NunWalk', 'LevelAttack11_Loop', 'LevelAttack013Loop', 'LevelAttack14'])
-  assert.deepEqual(group('Crepuscule · Movement'), ['Run', 'Walk'])
-  assert.deepEqual(group('Stigmata · Movement'), ['Run', 'Walk'])
-  assert.deepEqual(group('Zero · Movement'), ['Run'])
-  assert.ok(catalog.groups.every((g) => !/Attacks|Reactions/.test(g.label)))
-  assert.ok(catalog.groups.flatMap((g) => g.items).every((i) => !i.name.startsWith('Squat')))
-  assert.deepEqual(group('Movement'), ['Run'], 'the shown frame\'s own groups come first, unprefixed')
+test('lending frames: the Fight list of each frame offers the other\'s groups, cut down by the same rules', { skip }, () => {
+  const onShukra = withSources(buildCatalog(manifestOf('shukra'), 'fight'), sourcesFor('shukra'), 'fight')
+  const group = (catalog: typeof onShukra, label: string) => catalog.groups.find((g) => g.label === label)?.items.map((i) => i.label)
+  assert.deepEqual(group(onShukra, 'Pavo · Movement'), ['Run', 'Walk'])
+  assert.deepEqual(group(onShukra, 'Pavo · Level skills'), ['LevelAttack14'])
+  assert.deepEqual(group(onShukra, 'Pavo · Other'), ['Born', 'Executioner01', 'Executioner02', 'Executioner03', 'Executioner04', 'Executioner05', 'Save', 'Win'])
+  assert.deepEqual(group(onShukra, 'Movement'), ['Run', 'Walk'], 'the shown frame\'s own groups come first, unprefixed')
+  assert.ok(onShukra.groups.every((g) => !/Attacks|Reactions/.test(g.label)))
+  assert.ok(onShukra.groups.flatMap((g) => g.items).every((i) => !i.name.startsWith('Squat')))
+
+  const onPavo = withSources(buildCatalog(manifestOf('pavo'), 'fight'), sourcesFor('pavo'), 'fight')
+  assert.deepEqual(group(onPavo, 'Shukra · Movement'), ['Run', 'Walk'])
+  assert.deepEqual(group(onPavo, 'Shukra · Other'), ['Born', 'Save', 'Win'])
+  assert.equal(group(onPavo, 'Shukra · Level skills'), undefined, 'a frame with no level skills adds no such group')
 })
 
-test('own extras: Stigmata\'s other skins get Solitary Dream\'s two Board actions; Solitary Dream keeps its own', { skip: !haveFrames && 'data/ is not present' }, () => {
-  const read = (path: string) => parseManifest(JSON.parse(readFileSync(new URL(`../data/stigmata/${path}`, import.meta.url), 'utf8')))
-  const generic = withSources(buildCatalog(read('anim/manifest.json'), 'menu'), sourcesFor('stigmata'), 'menu', sourceOf('stigmata'))
-  const board = generic.groups.find((g) => g.label === 'Board actions')!.items
-  const sd = board.filter((i) => i.name === 'BoardAct10021' || i.name === 'BoardAct10022')
-  assert.deepEqual(sd.map((i) => i.fieldLabel), ['Solitary Dream · BoardAct10021', 'Solitary Dream · BoardAct10022'])
-  assert.ok(sd.every((i) => i.source?.frame === 'stigmata' && i.source.manifestPath === 'anim-skins/r4biankamd019241/manifest.json'))
-  const all = generic.groups.flatMap((g) => g.items)
+// Qu has no extra clip sets, so `animationSource.extras` is checked on made-up sources.
+
+const board = (names: string[]) =>
+  synthetic({
+    clips: [{ name: 'UiStand1' }, { name: 'Stand1' }, ...names.map((name) => ({ name }))],
+    menu: ['UiStand1', ...names],
+    fight: ['Stand1'],
+    menuIdle: 'UiStand1',
+    fightIdle: 'Stand1',
+  })
+
+test('own extras: another clip set\'s extra Board actions join the frame\'s own list; a native clip is not duplicated', () => {
+  const generic = board(['BoardAct0201'])
+  const special = board(['BoardAct0201', 'BoardAct10021', 'BoardAct10022'])
+  const source: AnimationSource = {
+    frame: 'f',
+    label: 'F',
+    manifestPath: 'anim/manifest.json',
+    manifest: generic,
+    extras: [{ manifestPath: 'anim-skins/special/manifest.json', manifest: special, clips: ['BoardAct10021', 'BoardAct10022'], label: 'Special' }],
+  }
+  const onGeneric = withSources(buildCatalog(generic, 'menu'), [], 'menu', source)
+  const items = onGeneric.groups.find((g) => g.label === 'Board actions')!.items
+  const extra = items.filter((i) => i.name === 'BoardAct10021' || i.name === 'BoardAct10022')
+  assert.deepEqual(extra.map((i) => i.fieldLabel), ['Special · BoardAct10021', 'Special · BoardAct10022'])
+  assert.ok(extra.every((i) => i.source?.frame === 'f' && i.source.manifestPath === 'anim-skins/special/manifest.json'))
+  const all = onGeneric.groups.flatMap((g) => g.items)
   assert.equal(new Set(all.map((i) => i.id)).size, all.length, 'item ids are unique')
 
-  const solitary = withSources(buildCatalog(read('anim-skins/r4biankamd019241/manifest.json'), 'menu'), sourcesFor('stigmata'), 'menu', sourceOf('stigmata'))
-  const own = solitary.groups.find((g) => g.label === 'Board actions')!.items.filter((i) => i.name === 'BoardAct10021')
+  const onSpecial = withSources(buildCatalog(special, 'menu'), [], 'menu', source)
+  const own = onSpecial.groups.find((g) => g.label === 'Board actions')!.items.filter((i) => i.name === 'BoardAct10021')
   assert.equal(own.length, 1, 'no lent copy next to the native clip')
   assert.equal(own[0]!.source, null)
 })
 
-test('replace extras: on another frame Veritas\' BoardAct1005 comes from Ink-lit Hermit in the same place; Veritas\' own list is unchanged', { skip: !haveFrames && 'data/ is not present' }, () => {
-  const own = parseManifest(JSON.parse(readFileSync(manifestUrl, 'utf8')))
-  const catalog = withSources(buildCatalog(own, 'menu'), sourcesFor('crepuscule'), 'menu')
-  const board = catalog.groups.find((g) => g.label === 'Veritas · Board actions')!.items
-  assert.equal(board.length, 10, 'replaced in place, not added')
-  const lent = board.find((i) => i.name === 'BoardAct1005')!
-  assert.equal(lent.source?.manifestPath, 'anim-skins/r3biankamd019141/manifest.json')
-  assert.equal(lent.fieldLabel, 'Veritas · BoardAct1005')
-  assert.equal(board.find((i) => i.name === 'BoardAct1004')!.source?.manifestPath, 'anim/manifest.json', 'the other Board actions stay Generic')
-  assert.deepEqual(board.map((i) => i.name), [...board.map((i) => i.name)].sort((a, b) => naturalCompare(a, b)), 'order kept')
-  const all = catalog.groups.flatMap((g) => g.items)
-  assert.equal(new Set(all.map((i) => i.id)).size, all.length, 'item ids are unique')
+test('replace extras: on another frame a lender\'s clip comes from the extra set in the same place; its own list is unchanged', () => {
+  const generic = board(['BoardAct0201', 'BoardAct1004', 'BoardAct1005'])
+  const special = board(['BoardAct0201', 'BoardAct1004', 'BoardAct1005'])
+  const lender: AnimationSource = {
+    frame: 'l',
+    label: 'Lender',
+    manifestPath: 'anim/manifest.json',
+    manifest: generic,
+    extras: [{ manifestPath: 'anim-skins/special/manifest.json', manifest: special, clips: ['BoardAct1005'], label: 'Special', replace: true }],
+  }
+  const shown = board(['BoardAct0201'])
+  const catalog = withSources(buildCatalog(shown, 'menu'), [lender], 'menu')
+  const lent = catalog.groups.find((g) => g.label === 'Lender · Board actions')!.items
+  assert.equal(lent.length, 3, 'replaced in place, not added')
+  assert.equal(lent.find((i) => i.name === 'BoardAct1005')!.source?.manifestPath, 'anim-skins/special/manifest.json')
+  assert.equal(lent.find((i) => i.name === 'BoardAct1005')!.fieldLabel, 'Lender · BoardAct1005')
+  assert.equal(lent.find((i) => i.name === 'BoardAct1004')!.source?.manifestPath, 'anim/manifest.json', 'the other clips stay Generic')
+  assert.deepEqual(lent.map((i) => i.name), [...lent.map((i) => i.name)].sort((a, b) => naturalCompare(a, b)), 'order kept')
 
-  // Veritas' own skins: its own clip, nothing from Ink-lit added.
-  const veritas = parseManifest(JSON.parse(readFileSync(new URL('../data/veritas/anim-skins/r3biankamd010031/manifest.json', import.meta.url), 'utf8')))
-  const mine = withSources(buildCatalog(veritas, 'menu'), sourcesFor('veritas'), 'menu', sourceOf('veritas'))
+  const mine = withSources(buildCatalog(generic, 'menu'), [], 'menu', lender)
   const myBoard = mine.groups.find((g) => g.label === 'Board actions')!.items
-  assert.equal(myBoard.length, 10)
-  assert.equal(myBoard.find((i) => i.name === 'BoardAct1005')!.source, null)
+  assert.equal(myBoard.length, 3)
+  assert.equal(myBoard.find((i) => i.name === 'BoardAct1005')!.source, null, 'the lender\'s own list keeps its own clip')
 })

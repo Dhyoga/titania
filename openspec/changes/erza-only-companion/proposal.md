@@ -8,11 +8,14 @@ merges Shukra's and Pavo's clips into one source for her, and removes the render
 
 - **Shukra and Pavo stop being frames**: never shown, not in any picker, no skin strip. They stay in `data/` and are still served for what
   Erza needs from them: clips, voice lines, and the rig of each Generic model (read from the GLB's JSON chunk only, as lent clips already do).
-- **BREAKING: the frame picker is removed.** The header names Erza; the skin strip holds her two skins.
+- **BREAKING: the frame picker is removed.** The header names Erza; the skin strip holds her skin (one for now; Heaven's Wheel Armor is a later change).
 - **One merged animation source**: Shukra's and Pavo's clips together, grouped by source in the list (`Shukra · Board actions`,
   `Pavo · Board actions`, their idles), since both have `BoardAct0201`…`BoardAct1007` and `UiStand1` under the same names.
 - **Display shows Erza**: the Display model is one of her skins; the lobby pool is the voiced Board actions of both sources, each with its
   own voice line; idles come from both sources' Menu idles.
+- **The idle tail in Display**: a line that outlasts its clip plays on in an idle (rare with the current pairings: only Shukra's
+  `BoardAct1004`, by 0.1 s). `add-erza-model` decides which idle takes over for Erza; this change checks that choice in Display, where
+  the lobby mixes both sources and a tap can fall inside the tail.
 - **The Animations popover without an own frame**: today the Display frame's own animations are always in and locked, which is what keeps
   the pool from being empty. Erza has no animations of her own, so `design.md` decides how the popover and the pool work for her: e.g. the
   two sources shown as sections that are all checked by default, with a rule that keeps at least one action (or an empty pool that idles).

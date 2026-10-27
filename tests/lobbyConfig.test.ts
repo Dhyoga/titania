@@ -25,9 +25,8 @@ test('every listed name is a frame, once per list', () => {
   }
 })
 
-test('only Crepuscule borrows by default: Board actions from Stigmata and Veritas, idles from Stigmata', () => {
-  assert.deepEqual(configured.map((f) => f.id), ['crepuscule'])
-  const lobby = getConstruct('crepuscule').lobby!
-  assert.deepEqual(lobby.actionFrom, ['stigmata', 'veritas'])
-  assert.deepEqual(lobby.idleFrom, ['stigmata'])
+test('Shukra and Pavo borrow from each other by default: Board actions and idles', () => {
+  assert.deepEqual(configured.map((f) => f.id), ['shukra', 'pavo'])
+  assert.deepEqual(getConstruct('shukra').lobby, { actionFrom: ['pavo'], idleFrom: ['pavo'] })
+  assert.deepEqual(getConstruct('pavo').lobby, { actionFrom: ['shukra'], idleFrom: ['shukra'] })
 })

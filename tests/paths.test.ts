@@ -9,10 +9,10 @@ test('default skin: the manifest folder is anim/', () => {
 
 test('other skins: clips sit next to their own manifest', () => {
   assert.equal(
-    resolveClipPath('anim-skins/r5biankamd019241/manifest.json', 'anim/BaseLayer/BoardAct0204.json'),
-    'anim-skins/r5biankamd019241/BaseLayer/BoardAct0204.json',
+    resolveClipPath('anim-skins/r3qumd019011/manifest.json', 'anim/BaseLayer/BoardAct0204.json'),
+    'anim-skins/r3qumd019011/BaseLayer/BoardAct0204.json',
   )
-  assert.equal(resolveClipPath('anim-skins/r5biankamd019241/manifest.json', 'anim/UiStand1.json'), 'anim-skins/r5biankamd019241/UiStand1.json')
+  assert.equal(resolveClipPath('anim-skins/r3qumd019011/manifest.json', 'anim/UiStand1.json'), 'anim-skins/r3qumd019011/UiStand1.json')
 })
 
 test('a manifest at the root keeps the stripped path', () => {
@@ -25,5 +25,5 @@ test('a clip file without the anim/ prefix is an error naming the file', () => {
 })
 
 test('a clip set comes from the model its manifest targets', () => {
-  assert.equal(targetModelPath('r4biankamd019241'), 'models/r4biankamd019241.glb')
+  assert.equal(targetModelPath('r3qumd019011'), 'models/r3qumd019011.glb')
 })

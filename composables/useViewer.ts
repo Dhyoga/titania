@@ -85,7 +85,6 @@ export function useViewer(container: Ref<HTMLElement | null>, model: Ref<ModelCh
       await shown.loadModel(assetUrl(frame.id, assets.modelPath), {
         hiddenNodes: manifest?.contexts.menu.hiddenNodes ?? [],
         keepCamera: camera.keep(),
-        lightForm: info.lightForm === true,
         widthShare: skinWidthShare(info),
         cameraView: camera.view(),
         holdReveal: camera.hold?.() === true,

@@ -13,7 +13,7 @@ import { disposeObject3D } from './dispose'
 import { FOLLOW_BONES, followFraction, nearestAnchor } from './follow'
 import { computeFraming, type Bounds } from './framing'
 import { DEFAULT_LIGHTING, type Lighting } from './lighting'
-import { hiddenNodeSet, lightFormChoices, listMeshes, type Mesh, type MeshOverride } from './parts'
+import { hiddenNodeSet, listMeshes, type Mesh, type MeshOverride } from './parts'
 import { Playback, type PlaybackState } from './Playback'
 import { collectTextures, estimateTextureBytes, type ViewerStats } from './stats'
 import { toAnimationClip } from './threeClip'
@@ -28,8 +28,6 @@ export interface LoadOptions {
   signal?: AbortSignal
   /** Keep a camera the user has moved (switching skins); the zoom limits still follow the new model. */
   keepCamera?: boolean
-  /** Start in the model's Light form (`lightFormChoices`): the default per-mesh choices, under the user's own. */
-  lightForm?: boolean
   /** Share of the bounds' half-width the default framing's width limit uses (`skinWidthShare`); 1 when omitted. */
   widthShare?: number
   /** The user's saved default camera (`setCameraView`), used instead of the built-in default framing; none when omitted. */
@@ -134,8 +132,6 @@ export class Viewer {
   private rig: Rig | null = null
   /** The user's show/hide choices by node name. Belongs to the viewer, not the model: it survives `loadModel` (skin switches). */
   private overrides: Record<string, MeshOverride> = {}
-  /** The loaded model's default choices (its Light form, when the skin asks for it); the user's choices win over them. */
-  private meshDefaults: Record<string, MeshOverride> = {}
   /** The manifest's hidden list for the current state; the user's choices are applied on top of it. */
   private manifestHidden: number[] = []
   private readonly stateHiddenListeners = new Set<(hidden: number[]) => void>()
@@ -310,7 +306,6 @@ export class Viewer {
     this.nodes = nodes
     this.meshes = listMeshes(meshRefs(gltf.parser))
     this.gltfJson = gltf.parser.json
-    this.meshDefaults = options.lightForm ? lightFormChoices(this.gltfJson, this.meshes) : {}
     this.widthShare = options.widthShare ?? 1
     this.savedView = options.cameraView ?? null
     applyHiddenNodes(nodes, new Set(options.hiddenNodes)) // the manifest's list only: the framing below must not depend on the user's choices
@@ -430,11 +425,6 @@ export class Viewer {
   /** The loaded model's listed meshes; empty before a model and for a single-mesh model. */
   getMeshes(): Mesh[] {
     return this.meshes
-  }
-
-  /** The loaded model's default choices by node name (empty unless it was loaded in its Light form). */
-  getMeshDefaults(): Readonly<Record<string, MeshOverride>> {
-    return this.meshDefaults
   }
 
   /**
@@ -929,7 +919,7 @@ export class Viewer {
   private applyVisibility(manifestHidden: number[]): void {
     const changed = manifestHidden.length !== this.manifestHidden.length || manifestHidden.some((n, i) => n !== this.manifestHidden[i])
     this.manifestHidden = manifestHidden
-    applyHiddenNodes(this.nodes, hiddenNodeSet(manifestHidden, this.meshes, { ...this.meshDefaults, ...this.overrides }))
+    applyHiddenNodes(this.nodes, hiddenNodeSet(manifestHidden, this.meshes, this.overrides))
     if (changed) for (const listener of this.stateHiddenListeners) listener(manifestHidden)
   }
 
@@ -1155,7 +1145,6 @@ export class Viewer {
     this.clipCache.clear()
     this.nodes = []
     this.meshes = []
-    this.meshDefaults = {}
     this.gltfJson = null
     this.rig = null
     this.manifestHidden = []

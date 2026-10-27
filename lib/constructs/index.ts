@@ -1,15 +1,13 @@
-import { crepuscule } from './crepuscule.ts'
-import { stigmata } from './stigmata.ts'
-import { veritas } from './veritas.ts'
-import { zero } from './zero.ts'
+import { shukra } from './shukra.ts'
+import { pavo } from './pavo.ts'
 import type { SkinConfig } from './skins.ts'
 
 export type { SkinConfig, SkinGroup } from './skins.ts'
 
 /**
  * What Display borrows for a frame's model from other frames' Generic clip sets (retargeted as in Playground, with the lender's own
- * voice line) when the user has chosen nothing for that frame: the default of the Animations popover. Any frame, Zero included, can be
- * chosen there; frame ids are from `FRAMES` and a frame never lists itself.
+ * voice line) when the user has chosen nothing for that frame: the default of the Animations popover. Any frame can be chosen there;
+ * frame ids are from `FRAMES` and a frame never lists itself.
  */
 export interface LobbyConfig {
   /** Frames whose voiced Board actions are borrowed by default. */
@@ -39,13 +37,13 @@ export interface ConstructConfig {
 }
 
 /**
- * Bianca's frames, in the order the panel's picker lists them. The one place that decides which constructs exist: the panel and
- * the build (`wxt.config.ts`, which serves every one of them) both read it.
+ * Qu's frames, in the order the panel's picker lists them (they are shown only until erza-only-companion). The one place that decides
+ * which constructs exist: the panel and the build (`wxt.config.ts`, which serves every one of them) both read it.
  */
-export const FRAMES: readonly ConstructConfig[] = [crepuscule, stigmata, veritas, zero]
+export const FRAMES: readonly ConstructConfig[] = [shukra, pavo]
 
 /** The frame the panel opens on. */
-export const DEFAULT_FRAME = crepuscule.id
+export const DEFAULT_FRAME = shukra.id
 
 export function getConstruct(id: string): ConstructConfig {
   const construct = FRAMES.find((f) => f.id === id)

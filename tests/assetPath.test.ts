@@ -3,13 +3,13 @@ import { test } from 'node:test'
 import { assetPath } from '../lib/assetPath.ts'
 
 test('plain paths are unchanged', () => {
-  assert.equal(assetPath('crepuscule', 'anim/manifest.json'), '/crepuscule/anim/manifest.json')
-  assert.equal(assetPath('stigmata', 'models/r4biankamd010031.glb'), '/stigmata/models/r4biankamd010031.glb')
-  assert.equal(assetPath('zero', 'voices.json'), '/zero/voices.json')
+  assert.equal(assetPath('shukra', 'anim/manifest.json'), '/shukra/anim/manifest.json')
+  assert.equal(assetPath('pavo', 'models/r2qumd010011.glb'), '/pavo/models/r2qumd010011.glb')
+  assert.equal(assetPath('shukra', 'voices.json'), '/shukra/voices.json')
 })
 
-test('a space in a folder name is encoded (Veritas and Zero: anim/Base Layer)', () => {
-  assert.equal(assetPath('veritas', 'anim/Base Layer/BoardAct0201.json'), '/veritas/anim/Base%20Layer/BoardAct0201.json')
+test('a space in a folder name is encoded (Pavo: anim/Base Layer)', () => {
+  assert.equal(assetPath('pavo', 'anim/Base Layer/BoardAct0201.json'), '/pavo/anim/Base%20Layer/BoardAct0201.json')
 })
 
 test('other characters that cannot stand in a URL path are encoded per segment, slashes stay', () => {

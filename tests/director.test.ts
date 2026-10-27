@@ -358,44 +358,44 @@ test('every play is followed by a prepare of the next action when there is one',
 
 // ---- Borrowed clips (add-lobby-variety): the director sees ids and weights only ----
 
-/** Crepuscule's items as Display resolves them: own clips and Stigmata's / Veritas' (names as in the Menu list). */
-function crepusculePool() {
+/** A shown frame's items as Display resolves them: own clips, a lender's, and a third frame's that lacks two lines (names as in the Menu list). */
+function defaultPool() {
   const names = ['BoardAct0201', 'BoardAct0202', 'BoardAct0203', 'BoardAct1004', 'BoardAct1006', 'BoardAct1007', 'UiStand1', 'StandAct0101']
   const items: PoolItem[] = [
     ...names.map((name, i) => ({ id: `#${i}`, name, frame: null, duration: 10 })),
-    ...names.map((name, i) => ({ id: `stigmata:anim/manifest.json#${i}`, name, frame: 'stigmata', duration: 10 })),
-    ...names.map((name, i) => ({ id: `veritas:anim/manifest.json#${i}`, name, frame: 'veritas', duration: 10 })),
+    ...names.map((name, i) => ({ id: `pavo:anim/manifest.json#${i}`, name, frame: 'pavo', duration: 10 })),
+    ...names.map((name, i) => ({ id: `third:anim/manifest.json#${i}`, name, frame: 'third', duration: 10 })),
   ]
-  const noLine = (frame: string | null, name: string) => frame === 'veritas' && (name === 'BoardAct0202' || name === 'BoardAct0203')
+  const noLine = (frame: string | null, name: string) => frame === 'third' && (name === 'BoardAct0202' || name === 'BoardAct0203')
   const line = (frame: string | null, name: string) => !noLine(frame, name)
-  const chosen = new Set(defaultChoice({ actionFrom: ['stigmata', 'veritas'], idleFrom: ['stigmata'] }, listCandidates(items, line, 'crepuscule')))
-  return resolvePool(items, line, { frame: 'crepuscule', chosen })
+  const chosen = new Set(defaultChoice({ actionFrom: ['pavo', 'third'], idleFrom: ['pavo'] }, listCandidates(items, line, 'shukra')))
+  return resolvePool(items, line, { frame: 'shukra', chosen })
 }
 
-test('400 idle picks on Crepuscule\'s weights give 20 % to 30 % borrowed ones', () => {
-  const pool = crepusculePool()
-  const idles: IdleChoice[] = pool.idles.map((i) => ({ ...i, duration: 20.5667 })) // own and Stigmata's UiStand1
+test('400 idle picks on the default weights give 20 % to 30 % borrowed ones', () => {
+  const pool = defaultPool()
+  const idles: IdleChoice[] = pool.idles.map((i) => ({ ...i, duration: 20.5667 })) // own and the lender's UiStand1
   for (const seed of [1, 2, 3]) {
     const d = createDirector({ actions: pool.actions, idles }, seeded(seed))
     d.handle({ type: 'start', entry: 'idle' }, 0)
-    let borrowed = d.state().current!.startsWith('stigmata:') ? 1 : 0
+    let borrowed = d.state().current!.startsWith('pavo:') ? 1 : 0
     for (let n = 1; n < 400; n++) {
       // The last loop of the dwell: the director picks the next idle (the same one just goes on looping).
       d.handle({ type: 'idleLoop', id: d.state().current!, loops: d.state().idleLoopsWanted }, n)
-      if (d.state().current!.startsWith('stigmata:')) borrowed++
+      if (d.state().current!.startsWith('pavo:')) borrowed++
     }
     assert.ok(borrowed >= 80 && borrowed <= 120, `seed ${seed}: ${borrowed} of 400 borrowed`)
   }
 })
 
-test('400 idle picks on Crepuscule and on a receiver with its own clips only never name StandAct0101', () => {
+test('400 idle picks with a lender and on a receiver with its own clips only never name StandAct0101', () => {
   const names = ['UiStand1', 'StandAct0101']
   const own: PoolItem[] = names.map((name, i) => ({ id: `#${i}`, name, frame: null, duration: 6 }))
-  const lent: PoolItem[] = names.map((name, i) => ({ id: `stigmata:anim/manifest.json#${i}`, name, frame: 'stigmata', duration: 6 }))
+  const lent: PoolItem[] = names.map((name, i) => ({ id: `pavo:anim/manifest.json#${i}`, name, frame: 'pavo', duration: 6 }))
   const nameOf = (id: string) => names[Number(id.slice(id.lastIndexOf('#') + 1))]
-  const cases: [PoolItem[], string[]][] = [[[...own, ...lent], ['stigmata:UiStand1', 'stigmata:StandAct0101']], [own, []]]
+  const cases: [PoolItem[], string[]][] = [[[...own, ...lent], ['pavo:UiStand1', 'pavo:StandAct0101']], [own, []]]
   for (const [items, chosen] of cases) {
-    const pool = resolvePool(items, () => true, { frame: 'crepuscule', chosen: new Set(chosen) })
+    const pool = resolvePool(items, () => true, { frame: 'shukra', chosen: new Set(chosen) })
     const d = createDirector({ actions: [], idles: pool.idles.map((i) => ({ ...i, duration: 6 })) }, seeded(5))
     d.handle({ type: 'start', entry: 'idle' }, 0)
     const picked = new Set([nameOf(d.state().current!)])
@@ -408,7 +408,7 @@ test('400 idle picks on Crepuscule and on a receiver with its own clips only nev
 })
 
 test('borrowed actions are one bag with the own ones: sixteen starts hold each once, none follows itself', () => {
-  const pool = crepusculePool()
+  const pool = defaultPool()
   assert.equal(pool.actions.length, 16)
   const d = createDirector({ actions: pool.actions, idles: [{ id: 'i', weight: 1, duration: 6 }] }, seeded(9))
   const taken: string[] = [played(d.handle({ type: 'start', entry: 'action' }, 0))!]

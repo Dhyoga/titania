@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Download 3D models (GLB), skin thumbnails and voice lines (en + ja) of constructs from huaxu.app.
+"""Download the Generic 3D model (GLB), its thumbnail and the voice lines (en + ja) of Qu's frames from huaxu.app.
 
-Usage: python3 download_construct.py zero veritas ... [--out data] [--workers 8]
+Usage: python3 download_construct.py shukra pavo [--out data] [--workers 8]
 
-Per slug, writes to <out>/<slug>/{models,icons,voices_en,voices_ja}/ and saves the voices page as
-<out>/<slug>/wiki/voices.html (the source of voices.json, see build_voices.py). Existing valid
-files are skipped, so the script is safe to re-run after an interruption.
+Per slug (a key of PREFABS), writes to <out>/<slug>/{models,icons,voices_en,voices_ja}/ and saves the voices page as
+<out>/<slug>/wiki/voices.html (the source of voices.json, see build_voices.py). Only the prefab named in PREFABS is
+downloaded: no other skin, coating or chibi. Existing valid files are skipped, so the script is safe to re-run after
+an interruption.
 """
 import argparse
 import json
@@ -18,6 +19,12 @@ from pathlib import Path
 WIKI = "https://huaxu.app/eu/wiki/constructs"
 ASSETS = "https://assets.huaxu.app"
 HEADERS = {"User-Agent": "Mozilla/5.0"}
+
+# Generic skin of each frame, the only model variant this project downloads (download_animations.py imports this table).
+PREFABS = {
+    "shukra": "r3qumd010011",
+    "pavo": "r2qumd010011",
+}
 
 
 def fetch(url, retries=3):
@@ -132,28 +139,21 @@ def save_page(html, dest):
 
 
 def plan(slug, root):
+    if slug not in PREFABS:
+        raise RuntimeError(f"unknown slug '{slug}' (known: {', '.join(PREFABS)})")
+    prefab = PREFABS[slug]
+
     model_html = page(f"{WIKI}/{slug}/model")
     voice_html = page(f"{WIKI}/{slug}/voices")
     save_page(voice_html, root / "wiki" / "voices.html")
 
-    # Ids are embedded in the page payload with escaped slashes (/).
-    prefabs = sorted(set(re.findall(r"charaterprefab\\u002F(\w+)", model_html)))
-    chibis = sorted(set(re.findall(r"room\\u002Fprefab\\u002F(\w+)", model_html)))
-    if not prefabs:
-        raise RuntimeError(f"no model prefabs found for '{slug}' (wrong slug?)")
+    jobs = [(f"{ASSETS}/models/charaterprefab/{prefab}/base.glb", root / "models" / f"{prefab}.glb", "glb")]
 
-    jobs = []
-    for pid in prefabs:
-        jobs.append((f"{ASSETS}/models/charaterprefab/{pid}/base.glb",
-                     root / "models" / f"{pid}.glb", "glb"))
-    for pid in chibis:
-        jobs.append((f"{ASSETS}/models/room/prefab/{pid}/base.glb",
-                     root / "models" / f"{pid}_chibi.glb", "glb"))
-
-    # Skin thumbnails, named after the model they belong to (the payload is on both pages).
-    icons = icon_jobs(model_html, root) or icon_jobs(voice_html, root)
+    # The thumbnail of that model only, named after it (the payload is on both pages).
+    icons = [j for j in (icon_jobs(model_html, root) or icon_jobs(voice_html, root))
+             if j[1].stem == prefab]
     if not icons:
-        print("  WARN no skin icons found in the page payload", file=sys.stderr)
+        print(f"  WARN no icon for {prefab} found in the page payload", file=sys.stderr)
     jobs += icons
 
     # English: exactly what the voices page links to.

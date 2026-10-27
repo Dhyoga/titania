@@ -2,11 +2,12 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { test } from 'node:test'
 
-// Checks of the generated `voices.json` of each Bianca frame against data/ and the pairing table
-// (`voice_pairings.json`, read by build_voices.py). Crepuscule's shipped file is included: the table's Crepuscule section is what
-// the builder is checked with. Skipped when data/ is absent.
+// Checks of the generated `voices.json` of Shukra and Pavo against data/ and the pairing table
+// (`voice_pairings.json`, read by build_voices.py). Skipped when data/ or a voices.json is absent.
 
-const FRAMES = ['crepuscule', 'stigmata', 'veritas', 'zero'] as const
+const FRAMES = ['shukra', 'pavo'] as const
+/** The huaxu voice folder of each frame's audio (design D3 of bootstrap-titania). */
+const VOICE_FOLDER = { shukra: 'v_qus', pavo: 'v_qu' } as const
 const dataDir = new URL('../data/', import.meta.url)
 const skip = !FRAMES.every((f) => existsSync(new URL(`${f}/voices.json`, dataDir))) && 'data/ or a voices.json is not present (run build_voices.py)'
 
@@ -30,9 +31,10 @@ const readJson = <T>(url: URL): T => JSON.parse(readFileSync(url, 'utf8')) as T
 const voices = (frame: string): VoicesFile => readJson<VoicesFile>(new URL(`${frame}/voices.json`, dataDir))
 const table = readJson<Record<string, Record<string, string>>>(new URL('../voice_pairings.json', import.meta.url))
 
-/** Names of every clip of the frame's manifests (default set and all skin sets), read raw: foreign manifests need no parsing here. */
+/** Names of every clip of the frame's manifests (the Generic set, and any `anim-skins/` set), read raw: no parsing needed here. */
 function clipNames(frame: string): Set<string> {
-  const folders = ['anim', ...readdirSync(new URL(`${frame}/anim-skins/`, dataDir)).map((d) => `anim-skins/${d}`)]
+  const skins = new URL(`${frame}/anim-skins/`, dataDir)
+  const folders = ['anim', ...(existsSync(skins) ? readdirSync(skins).map((d) => `anim-skins/${d}`) : [])]
   const names = new Set<string>()
   for (const folder of folders) {
     const manifest = new URL(`${frame}/${folder}/manifest.json`, dataDir)
@@ -80,24 +82,13 @@ for (const frame of FRAMES) {
   })
 }
 
-test('Stigmata: the paired lines are as long as the user\'s table suggests (BoardAct0201 is General Greeting 6)', { skip }, () => {
-  const entry = voices('stigmata').entries.find((e) => e.animation === 'BoardAct0201')
-  assert.equal(entry?.id, 'v_biankasuper_9_6')
-  assert.equal(entry?.title, 'General Greeting 6')
-})
+for (const frame of FRAMES) {
+  test(`${frame}: every entry's audio comes from the frame's own voice folder (${VOICE_FOLDER[frame]})`, { skip }, () => {
+    for (const e of voices(frame).entries) assert.match(e.id, new RegExp(`^${VOICE_FOLDER[frame]}_\\d`), e.id)
+  })
+}
 
-test('Solitary Dream\'s extra Board actions exist only in skin r4biankamd019241 and are paired', { skip }, () => {
-  const v = voices('stigmata')
-  for (const clip of ['BoardAct10021', 'BoardAct10022']) {
-    assert.ok(v.entries.some((e) => e.animation === clip), `${clip} is paired`)
-    const m = readJson<{ clips: { name: string }[] }>(new URL('stigmata/anim/manifest.json', dataDir))
-    assert.ok(!m.clips.some((c) => c.name === clip), `${clip} is not in the default clip set`)
-    const sd = readJson<{ clips: { name: string }[] }>(new URL('stigmata/anim-skins/r4biankamd019241/manifest.json', dataDir))
-    assert.ok(sd.clips.some((c) => c.name === clip), `${clip} is in skin 019241's clip set`)
-  }
-})
-
-test('Veritas has no line for BoardAct0202 and BoardAct0203', { skip }, () => {
-  const paired = new Set(voices('veritas').entries.map((e) => e.animation))
-  assert.ok(!paired.has('BoardAct0202') && !paired.has('BoardAct0203'))
+test('the pairing table says that the pairs were chosen by listening', { skip }, () => {
+  const comment = (table as unknown as { _comment?: string })._comment ?? ''
+  assert.match(comment, /listen/i, 'the `_comment` of voice_pairings.json must say how the pairs were chosen')
 })

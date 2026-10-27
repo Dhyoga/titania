@@ -3,7 +3,7 @@ import { PREFS_FILE_NAME, PrefsError } from '~/lib/prefs/prefs'
 import { downloadBlob } from './download'
 import { usePreferences } from './usePreferences'
 
-/** Export and import of the whole preferences record as a JSON file (`bianca-companion-preferences.json`). */
+/** Export and import of the whole preferences record as a JSON file (`titania-companion-preferences.json`). */
 export function usePreferenceFiles() {
   const { exportText, importText } = usePreferences()
   /** Why the last import was refused; empty after a good one. */

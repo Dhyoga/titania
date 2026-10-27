@@ -110,23 +110,16 @@ test('a controller state with a clip index outside the list names the controller
 
 // ---------------------------------------------------------------- the real file (skipped when data/ is absent)
 
-const defaultManifest = new URL('../data/crepuscule/anim/manifest.json', import.meta.url)
+const skip = !['shukra', 'pavo'].every((f) => existsSync(new URL(`../data/${f}/anim/manifest.json`, import.meta.url))) && 'data/ is not present'
 
-test('real default manifest parses', { skip: !existsSync(defaultManifest) && 'data/ is not present' }, () => {
-  const m = parseManifest(JSON.parse(readFileSync(defaultManifest, 'utf8')))
-  assert.equal(m.target, 'r5biankamd010011')
-  assert.equal(m.clips.length, 139)
-  assert.deepEqual(m.contexts.menu.hiddenNodes, [392, 394, 395, 396])
-  assert.equal(m.clips[m.contexts.menu.idle.clip]!.name, 'UiStand1')
-  assert.equal(m.clips[m.contexts.menu.entry.clip]!.name, 'UiStand1')
-})
-
-test('real manifests of Stigmata, Veritas and Zero parse (no hidden node lists)', { skip: !existsSync(new URL('../data/stigmata/anim/manifest.json', import.meta.url)) && 'data/ is not present' }, () => {
-  for (const [frame, clips] of [['stigmata', 113], ['veritas', 55], ['zero', 51]] as const) {
+test('real manifests of Shukra and Pavo parse (no hidden node lists, no state hides)', { skip }, () => {
+  for (const [frame, target, clips] of [['shukra', 'r3qumd010011', 70], ['pavo', 'r2qumd010011', 100]] as const) {
     const m = parseManifest(JSON.parse(readFileSync(new URL(`../data/${frame}/anim/manifest.json`, import.meta.url), 'utf8')))
+    assert.equal(m.target, target, frame)
     assert.equal(m.clips.length, clips, frame)
     assert.deepEqual(m.contexts.menu.hiddenNodes, [], frame)
     assert.deepEqual(m.contexts.menu.stateHides, {}, frame)
     assert.equal(m.clips[m.contexts.menu.idle.clip]!.name, 'UiStand1', frame)
+    assert.equal(m.clips[m.contexts.menu.entry.clip]!.name, 'UiStand1', frame)
   }
 })

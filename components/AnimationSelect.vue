@@ -38,7 +38,7 @@ const listStyle = ref<Record<string, string>>({})
 const active = ref(0)
 
 /** Every selectable item in display order: the groups' items. Headers are not options. */
-// The field and type-ahead use `fieldLabel` (`Veritas · Win` for a clip another frame lends); the list shows `label` under its group.
+// The field and type-ahead use `fieldLabel` (`<frame> · Win` for a clip another frame lends); the list shows `label` under its group.
 const options = computed<Option[]>(() => props.groups.flatMap((g) => g.items.map((i) => ({ value: i.id, label: i.fieldLabel }))))
 const optionIndex = computed(() => new Map(options.value.map((o, i) => [o.value, i])))
 const shownValue = computed<Selection | null>(() => props.pending ?? props.selected)

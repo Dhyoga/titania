@@ -15,8 +15,7 @@ export interface GroupView {
  * Meshes of the shown model and the user's show/hide choices for them. The unsaved choices (`overrides`) are a plain record by node
  * name, kept across skin switches; what is saved for the shown skin (`usePreferences`, by skin id) sits under them. Both are pushed to
  * the viewer, saved first, on every change and for every new session. Unsaved choices start empty on every open: everything is as
- * what is saved for the skin says, else as the animation data says, or, for a skin opened in its Light form, as the model's defaults
- * say (the viewer's `getMeshDefaults`, which saved and unsaved choices win over).
+ * what is saved for the skin says, else as the animation data says.
  *
  * The list has two parts, as on huaxu: the meshes the current animation state hides (alternate-state copies, switched on at
  * will) and every other mesh, grouped by the model id in its name.
@@ -28,18 +27,14 @@ export function useParts(session: Ref<ViewerSession | null>) {
   const meshes = computed(() => session.value?.viewer.getMeshes() ?? [])
   /** Node names of the shown model's listed meshes. */
   const present = computed<ReadonlySet<string>>(() => new Set(meshes.value.map((m) => m.name)))
-  /** The shown skin's default form (from the model). */
-  const formDefaults = computed(() => session.value?.viewer.getMeshDefaults() ?? {})
   /** What is saved for the shown skin, by node name. */
   const saved = computed<Record<string, MeshOverride>>(() => {
     const id = session.value?.skin.id
     return (id !== undefined && prefs.value.skins[id]?.parts) || {}
   })
   const hasSaved = computed(() => Object.keys(saved.value).length > 0)
-  /** What the skin shows without unsaved choices: the default form, then what is saved. */
-  const defaults = computed<Record<string, MeshOverride>>(() => ({ ...formDefaults.value, ...saved.value }))
-  /** Defaults with the user's unsaved choices on top: what the switches show. */
-  const choices = computed(() => ({ ...defaults.value, ...overrides.value }))
+  /** What is saved with the user's unsaved choices on top: what the switches show. */
+  const choices = computed(() => ({ ...saved.value, ...overrides.value }))
   /** Nodes the manifest hides in the current state; follows clip, context and skin changes. */
   const stateHidden = ref<ReadonlySet<number>>(new Set())
 
@@ -74,11 +69,11 @@ export function useParts(session: Ref<ViewerSession | null>) {
   /** Any unsaved choice at all, for names this model lacks too (what Reset drops). */
   const anyChanged = computed(() => Object.keys(overrides.value).length > 0)
   /** An unsaved choice that changes this model (what Save would store). */
-  const canSave = computed(() => hasChoicesHere(overrides.value, present.value, defaults.value))
+  const canSave = computed(() => hasChoicesHere(overrides.value, present.value, saved.value))
 
-  /** Set a choice, or drop it when it is what the skin already shows without it (saved, else the default form). */
+  /** Set a choice, or drop it when it is what the skin already shows without it (what is saved). */
   function choose(next: Record<string, MeshOverride>, mesh: Mesh, choice: MeshOverride): void {
-    if (defaults.value[mesh.name] === choice) delete next[mesh.name]
+    if (saved.value[mesh.name] === choice) delete next[mesh.name]
     else next[mesh.name] = choice
   }
 
@@ -91,7 +86,7 @@ export function useParts(session: Ref<ViewerSession | null>) {
   /**
    * A whole model-id group: hide all of it (its alternate-state copies too, so a clip's swap cannot bring it back), or, when
    * something in it is hidden, show every listed mesh of it: the choices for it are dropped, so it follows the animation data
-   * again, except where the model's defaults would keep a listed mesh hidden (the Light form's `Band`), which gets `show`.
+   * again, except where what is saved keeps a listed mesh hidden, which gets `show`.
    */
   function toggleGroup(id: string): void {
     const group = groups.value.find((g) => g.id === id)
@@ -103,13 +98,13 @@ export function useParts(session: Ref<ViewerSession | null>) {
       for (const mesh of meshes.value) {
         if (mesh.group !== id) continue
         delete next[mesh.name]
-        if (group.meshes.includes(mesh) && defaults.value[mesh.name] === 'hide') next[mesh.name] = 'show'
+        if (group.meshes.includes(mesh) && saved.value[mesh.name] === 'hide') next[mesh.name] = 'show'
       }
     }
     overrides.value = next
   }
 
-  /** Back to what is saved for the skin (else what the animation data and the default form say), including unsaved choices for names the shown skin lacks. */
+  /** Back to what is saved for the skin (else what the animation data says), including unsaved choices for names the shown skin lacks. */
   function reset(): void {
     overrides.value = {}
   }
@@ -121,14 +116,14 @@ export function useParts(session: Ref<ViewerSession | null>) {
   function save(): boolean {
     const id = session.value?.skin.id
     if (id === undefined) return false
-    const next = partsToSave(saved.value, overrides.value, present.value, formDefaults.value)
+    const next = partsToSave(saved.value, overrides.value, present.value)
     update((p) => withSkinParts(p, id, next))
     overrides.value = choicesElsewhere(overrides.value, present.value)
     return flush()
   }
 
   /**
-   * Remove what is saved for this skin only; it goes back to the default form and the animation data, and so do its unsaved choices
+   * Remove what is saved for this skin only; it goes back to the animation data, and so do its unsaved choices
    * (those for names this model lacks stay for the models that have them).
    */
   function forgetSaved(): boolean {

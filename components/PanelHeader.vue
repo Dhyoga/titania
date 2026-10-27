@@ -86,7 +86,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', onDocumentPoin
 
 <template>
   <header class="flex items-center justify-between gap-2 bg-bg px-4 py-3">
-    <!-- The construct name is the frame picker: a button with a chevron that opens a short list of Bianca's frames. -->
+    <!-- The construct name is the frame picker: a button with a chevron that opens a short list of the frames. -->
     <div ref="root" class="relative inline-block">
       <h1 class="text-base font-semibold text-text">
         <button

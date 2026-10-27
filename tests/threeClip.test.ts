@@ -189,7 +189,7 @@ test('clip name and duration carry over', () => {
 
 // Real data: which root tracks survive for each frame. Skipped when data/ is absent.
 const dataRoot = new URL('../data/', import.meta.url)
-const haveData = existsSync(new URL('crepuscule/anim/manifest.json', dataRoot)) && existsSync(new URL('stigmata/anim/manifest.json', dataRoot))
+const haveData = existsSync(new URL('shukra/anim/manifest.json', dataRoot)) && existsSync(new URL('pavo/anim/manifest.json', dataRoot))
 
 /** Object per glTF node with the node's own name, and the decoded clip `name` of the frame's default clip set. */
 function realClip(frame: string, model: string, name: string) {
@@ -202,16 +202,12 @@ function realClip(frame: string, model: string, name: string) {
   return { nodes, decoded, rootNode: entry.rootNode }
 }
 
-test('real data: Crepuscule Attack93 loses its root position, Stigmata Run keeps the pelvis height', { skip: !haveData && 'data/ is not present' }, () => {
-  const cre = realClip('crepuscule', 'r5biankamd010011', 'Attack93')
-  assert.equal(cre.nodes[cre.rootNode]!.name, 'Root')
-  const creBuilt = toAnimationClip(cre.decoded, cre.nodes, { rootNode: cre.rootNode, inPlace: true }).clip
-  const rootUuid = cre.nodes[cre.rootNode]!.uuid
-  assert.ok(!creBuilt.tracks.some((t) => t.name === `${rootUuid}.position`), 'Root position is dropped')
-  assert.ok(cre.decoded.tracks.some((t) => t.node === cre.rootNode && t.property === 'position'), 'the data does animate it')
-
-  const st = realClip('stigmata', 'r4biankamd010011', 'Run')
-  assert.equal(st.nodes[st.rootNode]!.name, 'Bip001')
-  const stBuilt = toAnimationClip(st.decoded, st.nodes, { rootNode: st.rootNode, inPlace: true }).clip
-  assert.ok(stBuilt.tracks.some((t) => t.name === `${st.nodes[st.rootNode]!.uuid}.position`), 'Bip001 position is kept')
+test('real data: Qu\'s clips are built on Bip001, and in place keeps its position (the pelvis height, not travel)', { skip: !haveData && 'data/ is not present' }, () => {
+  for (const [frame, model] of [['shukra', 'r3qumd010011'], ['pavo', 'r2qumd010011']] as const) {
+    const run = realClip(frame, model, 'Run')
+    assert.equal(run.nodes[run.rootNode]!.name, 'Bip001', frame)
+    assert.ok(run.decoded.tracks.some((t) => t.node === run.rootNode && t.property === 'position'), `${frame}: the data animates the root position`)
+    const built = toAnimationClip(run.decoded, run.nodes, { rootNode: run.rootNode, inPlace: true }).clip
+    assert.ok(built.tracks.some((t) => t.name === `${run.nodes[run.rootNode]!.uuid}.position`), `${frame}: Bip001 position is kept`)
+  }
 })

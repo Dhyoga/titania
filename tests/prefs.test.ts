@@ -21,8 +21,8 @@ const sample = (): Prefs => ({
   version: 1,
   display: { backgroundMode: 'solid', solidColor: '#102030', grid: true, follow: false, toon: false, intensity: 1.5, azimuthDeg: -40 },
   camera,
-  lobby: { frame: 'stigmata', skin: 'r4biankamd019241', camera: { ...camera, zoom: 0.45 }, pools: { crepuscule: ['stigmata:BoardAct0201', 'zero:UiStand1'], veritas: [] } },
-  skins: { r5biankamd019271: { parts: { R5BiankaMd019271Hat: 'hide', Band: 'show' } } },
+  lobby: { frame: 'pavo', skin: 'r2qumd010011', camera: { ...camera, zoom: 0.45 }, pools: { shukra: ['pavo:BoardAct0201', 'fourth:UiStand1'], third: [] } },
+  skins: { r3qumd010011: { parts: { R3QuMd010011Weapon: 'hide', Band: 'show' } } },
 })
 
 test('the defaults are what the panel started with before preferences existed', () => {
@@ -138,7 +138,7 @@ test('strict import rejects a field of the wrong type instead of defaulting it',
     { version: 1, skins: [] },
     { version: 1, skins: { a: 5 } },
     { version: 1, skins: { a: { parts: { Hat: 'maybe' } } } },
-    { version: 1, lobby: 'crepuscule' },
+    { version: 1, lobby: 'shukra' },
     { version: 1, lobby: { frame: 3 } },
     { version: 1, lobby: { skin: '' } },
     { version: 1, lobby: { camera: 'close' } },
@@ -183,9 +183,9 @@ test('a record or file from before Display mode reads the Display defaults and k
 
 test('each Display field falls back on its own', () => {
   const read = (lobby: unknown) => parsePrefs(JSON.stringify({ ...sample(), lobby })).lobby
-  assert.deepEqual(read('crepuscule'), defaultLobby())
-  assert.deepEqual(read({ frame: 'veritas', skin: 7, camera: 'close' }), { frame: 'veritas', skin: null, camera: null, pools: {} })
-  assert.deepEqual(read({ frame: '', skin: 'r3biankamd019191', camera }), { frame: null, skin: 'r3biankamd019191', camera, pools: {} })
+  assert.deepEqual(read('shukra'), defaultLobby())
+  assert.deepEqual(read({ frame: 'third', skin: 7, camera: 'close' }), { frame: 'third', skin: null, camera: null, pools: {} })
+  assert.deepEqual(read({ frame: '', skin: 'r3qumd019011', camera }), { frame: null, skin: 'r3qumd019011', camera, pools: {} })
   assert.deepEqual(read({ frame: 'x'.repeat(65) }), defaultLobby())
   // The Display camera is independent of the Playground one.
   const p = parsePrefs(JSON.stringify({ ...sample(), camera: 'bad' }))
@@ -206,10 +206,10 @@ test('the animation choices read tolerantly: a bad entry or key is dropped on it
   const read = (pools: unknown) => parsePrefs(JSON.stringify({ ...sample(), lobby: { ...sample().lobby, pools } })).lobby.pools
   assert.deepEqual(read('all'), {})
   assert.deepEqual(read([['a:b']]), {})
-  assert.deepEqual(read({ crepuscule: 'x', veritas: ['zero:BoardAct1004', 'zero:BoardAct1004', 7, 'nocolon', ':x', 'x:', 'z'.repeat(70) + ':a', null] }), { veritas: ['zero:BoardAct1004'] })
-  assert.deepEqual(read({ stigmata: [] }), { stigmata: [] })
+  assert.deepEqual(read({ shukra: 'x', third: ['fourth:BoardAct1004', 'fourth:BoardAct1004', 7, 'nocolon', ':x', 'x:', 'z'.repeat(70) + ':a', null] }), { third: ['fourth:BoardAct1004'] })
+  assert.deepEqual(read({ pavo: [] }), { pavo: [] })
   assert.deepEqual(read({ '': ['a:b'], ['x'.repeat(65)]: ['a:b'] }), {})
-  assert.deepEqual(read(JSON.parse('{"__proto__": ["a:b"], "zero": ["veritas:Run"]}')), { zero: ['veritas:Run'] })
+  assert.deepEqual(read(JSON.parse('{"__proto__": ["a:b"], "fourth": ["third:Run"]}')), { fourth: ['third:Run'] })
   assert.deepEqual(Object.keys(read(JSON.parse('{"__proto__": ["a:b"]}'))), [])
   // The other Display fields are unaffected.
   const p = parsePrefs(JSON.stringify({ ...sample(), lobby: { ...sample().lobby, pools: 3 } }))
@@ -220,10 +220,10 @@ test('the animation choices read strictly: any wrong shape is an error and names
   const imp = (pools: unknown) => () => importPrefs(JSON.stringify({ ...sample(), lobby: { ...sample().lobby, pools } }))
   assert.throws(imp('all'), PrefsError)
   assert.throws(imp([]), PrefsError)
-  assert.throws(imp({ crepuscule: 'stigmata:BoardAct0201' }), /lobby\.pools\.crepuscule/)
-  assert.throws(imp({ crepuscule: ['stigmata:BoardAct0201', 5] }), /lobby\.pools\.crepuscule/)
-  assert.throws(imp({ crepuscule: ['no colon'] }), PrefsError)
-  assert.doesNotThrow(imp({ crepuscule: ['stigmata:BoardAct0201'], veritas: [] }))
+  assert.throws(imp({ shukra: 'pavo:BoardAct0201' }), /lobby\.pools\.shukra/)
+  assert.throws(imp({ shukra: ['pavo:BoardAct0201', 5] }), /lobby\.pools\.shukra/)
+  assert.throws(imp({ shukra: ['no colon'] }), PrefsError)
+  assert.doesNotThrow(imp({ shukra: ['pavo:BoardAct0201'], third: [] }))
 })
 
 test('a record or file without the animation choices reads every frame on its default', () => {
@@ -231,7 +231,7 @@ test('a record or file without the animation choices reads every frame on its de
   const text = JSON.stringify({ ...sample(), lobby })
   assert.deepEqual(parsePrefs(text).lobby.pools, {})
   assert.deepEqual(importPrefs(text).lobby.pools, {})
-  assert.deepEqual(parsePrefs(text).lobby.frame, 'stigmata')
+  assert.deepEqual(parsePrefs(text).lobby.frame, 'pavo')
 })
 
 test('the animation choices survive a round trip and an export, and go with forget all', () => {
@@ -243,12 +243,12 @@ test('the animation choices survive a round trip and an export, and go with forg
 
 test('withPool sets, replaces and forgets one frame\'s choice and leaves the rest alone', () => {
   const base = sample()
-  const set = withPool(base, 'zero', ['stigmata:BoardAct1004', 'stigmata:BoardAct1004'])
-  assert.deepEqual(set.lobby.pools, { ...base.lobby.pools, zero: ['stigmata:BoardAct1004'] })
-  assert.deepEqual(base.lobby.pools.crepuscule, ['stigmata:BoardAct0201', 'zero:UiStand1'], 'the input is not changed')
-  assert.deepEqual(withPool(set, 'zero', []).lobby.pools.zero, [])
-  assert.equal('zero' in withPool(set, 'zero', null).lobby.pools, false)
-  assert.deepEqual(withPool(base, 'crepuscule', null).lobby.pools, { veritas: [] })
+  const set = withPool(base, 'fourth', ['pavo:BoardAct1004', 'pavo:BoardAct1004'])
+  assert.deepEqual(set.lobby.pools, { ...base.lobby.pools, fourth: ['pavo:BoardAct1004'] })
+  assert.deepEqual(base.lobby.pools.shukra, ['pavo:BoardAct0201', 'fourth:UiStand1'], 'the input is not changed')
+  assert.deepEqual(withPool(set, 'fourth', []).lobby.pools.fourth, [])
+  assert.equal('fourth' in withPool(set, 'fourth', null).lobby.pools, false)
+  assert.deepEqual(withPool(base, 'shukra', null).lobby.pools, { third: [] })
   assert.equal(withPool(base, '__proto__', ['a:b']), base)
   assert.deepEqual({ ...set.lobby, pools: {} }, { ...base.lobby, pools: {} })
 })

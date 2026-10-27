@@ -11,8 +11,8 @@ export default defineConfig({
     plugins: [tailwindcss()],
   }),
   manifest: {
-    name: 'Bianca: Gray Raven Companion',
-    description: 'Side panel companion for Bianca in Punishing: Gray Raven: 3D models, animations and voice lines.',
+    name: 'Titania: Fairy Tail Companion',
+    description: 'Side panel companion for Erza Scarlet of Fairy Tail: 3D models, animations and voice lines.',
     permissions: ['sidePanel'],
     action: { default_title: 'Open viewer' },
   },

@@ -1,4 +1,4 @@
-// Every shipped clip of Bianca's four frames decodes and agrees with the GLB it was exported for. Skipped when data/ is absent.
+// Every shipped clip of Shukra and Pavo decodes and agrees with the GLB it was exported for. Skipped when data/ is absent.
 import assert from 'node:assert/strict'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
@@ -7,10 +7,8 @@ import { loadClip, loadManifest } from '../lib/anim/loader.ts'
 import { parseManifest, type AnimManifest } from '../lib/anim/manifest.ts'
 import { resolveClipPath } from '../lib/anim/paths.ts'
 
-const FRAMES = ['crepuscule', 'stigmata', 'veritas', 'zero'] as const
-/** Manifests of models that are not offered: Stigmata's battle chibi has clips but no Menu context. */
-const NOT_OFFERED = new Set(['q4biankamd010011'])
-const dataDir = new URL('../data/crepuscule/', import.meta.url)
+const FRAMES = ['shukra', 'pavo'] as const
+const dataDir = new URL('../data/shukra/', import.meta.url)
 const skip = !FRAMES.every((f) => existsSync(new URL(`../data/${f}/anim/manifest.json`, import.meta.url))) && 'data/ is not present'
 const frameDir = (frame: string): URL => new URL(`../data/${frame}/`, import.meta.url)
 const readIn = (frame: string, path: string): Buffer => readFileSync(new URL(path, frameDir(frame)))
@@ -22,7 +20,7 @@ interface GlbJson {
 }
 
 /** JSON chunk of a GLB (the first chunk follows the 12 byte header and its own 8 byte chunk header). */
-function glbJson(path: string, frame = 'crepuscule'): GlbJson {
+function glbJson(path: string, frame: string): GlbJson {
   const b = readIn(frame, path)
   return JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString('utf8'))
 }
@@ -55,7 +53,8 @@ function loopClosure(clip: Clip, rootNode: number, include: (node: number) => bo
 const manifestFolders = skip
   ? []
   : FRAMES.flatMap((frame) =>
-      ['anim', ...readdirSync(new URL('anim-skins/', frameDir(frame))).sort().filter((d) => !NOT_OFFERED.has(d)).map((d) => `anim-skins/${d}`)].map((folder) => [frame, folder] as const),
+      // Qu's frames have the Generic clip set only; another set (`anim-skins/<id>/`) would be swept too.
+      ['anim', ...(existsSync(new URL('anim-skins/', frameDir(frame))) ? readdirSync(new URL('anim-skins/', frameDir(frame))).sort().map((d) => `anim-skins/${d}`) : [])].map((folder) => [frame, folder] as const),
     )
 
 for (const [frame, folder] of manifestFolders) {
@@ -80,7 +79,7 @@ for (const [frame, folder] of manifestFolders) {
         continue
       }
       // A clip without `packing` is a single static pose: it has no key times, so the manifest's duration is not checkable
-      // (Stigmata's `Lieonfloor` says 0.333 s and decodes to one frame).
+      // (it decodes to one frame whatever duration the manifest gives).
       if (packed && Math.abs(clip.duration - entry.duration) > 0.02) problems.push(`${where}: duration ${clip.duration} vs manifest ${entry.duration}`)
 
       for (const t of clip.tracks) {
@@ -96,12 +95,12 @@ for (const [frame, folder] of manifestFolders) {
         }
       }
       if (entry.loop && packed) {
-        // Crepuscule's clips close on every bone. The other frames' hair, cloth and shirt bones are recorded physics and end a
-        // few degrees off the start, so there the check covers the body (`Bip001…`) bones only.
-        const body = frame === 'crepuscule' ? undefined : (node: number) => (glb.nodes[node]?.name ?? '').startsWith('Bip001')
+        // Hair, cloth and prop bones are recorded physics and end a few degrees off the start, so the check covers the body
+        // (`Bip001…`) bones only.
+        const body = (node: number) => (glb.nodes[node]?.name ?? '').startsWith('Bip001')
         const closure = loopClosure(clip, entry.rootNode, body)
         looping++
-        if (closure < 0.9) problems.push(`${where}: loops, but only ${(closure * 100).toFixed(0)}% of its ${body ? 'body ' : ''}tracks end where they start`)
+        if (closure < 0.9) problems.push(`${where}: loops, but only ${(closure * 100).toFixed(0)}% of its body tracks end where they start`)
       }
       for (const m of clip.morphs) {
         const mesh = glb.nodes[m.node]?.mesh
@@ -116,24 +115,31 @@ for (const [frame, folder] of manifestFolders) {
 }
 
 test('clips start from the model: key 0 matches the bind pose where the clip does not move a bone', { skip }, () => {
-  const manifest = parseManifest(JSON.parse(read('anim/manifest.json').toString('utf8')))
-  const glb = glbJson(`models/${manifest.target}.glb`)
-  const byName = (name: string) => glb.nodes.findIndex((n) => n.name === name)
-  for (const clipName of ['UiStand1', 'StandAct0101', 'BoardAct0201', 'BoardAct1007']) {
-    const entry = manifest.clips.find((c) => c.name === clipName)!
-    const clip = decodeClip(JSON.parse(read(resolveClipPath('anim/manifest.json', entry.file)).toString('utf8')), clipName)
+  for (const frame of FRAMES) {
+    const manifest = parseManifest(JSON.parse(readIn(frame, 'anim/manifest.json').toString('utf8')))
+    const glb = glbJson(`models/${manifest.target}.glb`, frame)
+    const byName = (name: string) => glb.nodes.findIndex((n) => n.name === name)
+    let pelvisChecked = 0
+    for (const clipName of ['UiStand1', 'StandAct0101', 'BoardAct0201', 'BoardAct1007']) {
+      const entry = manifest.clips.find((c) => c.name === clipName)!
+      const clip = decodeClip(JSON.parse(readIn(frame, resolveClipPath('anim/manifest.json', entry.file)).toString('utf8')), clipName)
 
-    // Bones keep their bind offsets in these clips: almost every position track starts at the node's own translation.
-    const positions = clip.tracks.filter((t) => t.property === 'position')
-    const same = positions.filter((t) => (glb.nodes[t.node]!.translation ?? [0, 0, 0]).every((v, c) => Math.abs(v - t.values[c]!) < 2e-3))
-    assert.ok(same.length / positions.length > 0.9, `${clipName}: only ${same.length} of ${positions.length} position tracks start at the bind position`)
+      // Bones keep their bind offsets in these clips: most position tracks start at the node's own translation. The rest are the
+      // pelvis (its height) and the helper bones (`*repairBone*`, `BoneCalf*`) that the clips move: 88 to 95% start at the bind position
+      // on Qu's models. A decoder that gets deltas or planes wrong puts almost every track off it.
+      const positions = clip.tracks.filter((t) => t.property === 'position')
+      const same = positions.filter((t) => (glb.nodes[t.node]!.translation ?? [0, 0, 0]).every((v, c) => Math.abs(v - t.values[c]!) < 2e-3))
+      assert.ok(same.length / positions.length > 0.85, `${frame} ${clipName}: only ${same.length} of ${positions.length} position tracks start at the bind position`)
 
-    // The pelvis stands in its bind rotation at key 0 (rotation tracks are compared up to sign).
-    const pelvis = clip.tracks.find((t) => t.property === 'quaternion' && t.node === byName('Bip001Pelvis'))
-    assert.ok(pelvis, `${clipName}: no pelvis rotation track`)
-    const rest = glb.nodes[pelvis.node]!.rotation!
-    const d = rest.reduce((sum, v, c) => sum + v * pelvis.values[c]!, 0)
-    assert.ok(Math.abs(Math.abs(d) - 1) < 1e-3, `${clipName}: pelvis key 0 is not the bind rotation (dot ${d})`)
+      // The pelvis stands in its bind rotation at key 0 (rotation tracks are compared up to sign). Not every clip has a pelvis rotation track.
+      const pelvis = clip.tracks.find((t) => t.property === 'quaternion' && t.node === byName('Bip001Pelvis'))
+      if (!pelvis) continue
+      pelvisChecked++
+      const rest = glb.nodes[pelvis.node]!.rotation!
+      const d = rest.reduce((sum, v, c) => sum + v * pelvis.values[c]!, 0)
+      assert.ok(Math.abs(Math.abs(d) - 1) < 1e-3, `${frame} ${clipName}: pelvis key 0 is not the bind rotation (dot ${d})`)
+    }
+    assert.ok(pelvisChecked >= 2, `${frame}: the pelvis rotation was checked on ${pelvisChecked} clips`)
   }
 })
 
@@ -144,10 +150,10 @@ test('manifests and clips load through the loader with a fetch that serves files
   }) as unknown as typeof fetch
 
   const manifest: AnimManifest = await loadManifest('mem://anim/manifest.json', { fetch: files })
-  assert.equal(manifest.clips.length, 139)
+  assert.equal(manifest.clips.length, 70)
   const entry = manifest.clips.find((c) => c.name === 'BoardAct0201')!
   const clip = await loadClip(`mem://${resolveClipPath('anim/manifest.json', entry.file)}`, entry.name, { fetch: files })
-  assert.equal(clip.count, 886)
-  assert.ok(Math.abs(clip.duration - 29.5) < 0.01)
+  assert.equal(clip.count, 971)
+  assert.ok(Math.abs(clip.duration - 32.333) < 0.01)
   await assert.rejects(loadClip('mem://anim/BaseLayer/Nope.json', 'Nope', { fetch: files }), /Nope\.json.*404/)
 })

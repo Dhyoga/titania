@@ -4,10 +4,10 @@
 import { readCameraView, type CameraView } from '../viewer/cameraView.ts'
 import { DEFAULT_LIGHTING, LIGHT_AZIMUTH_RANGE, LIGHT_INTENSITY_RANGE } from '../viewer/lighting.ts'
 
-export const PREFS_KEY = 'pgr.prefs'
+export const PREFS_KEY = 'titania.prefs'
 export const PREFS_VERSION = 1
 /** Name of the file "Export" downloads. */
-export const PREFS_FILE_NAME = 'bianca-companion-preferences.json'
+export const PREFS_FILE_NAME = 'titania-companion-preferences.json'
 
 export const BACKGROUND_MODES = ['gradient', 'solid', 'transparent'] as const
 export type BackgroundMode = (typeof BACKGROUND_MODES)[number]
@@ -30,7 +30,7 @@ export interface DisplayPrefs {
 export type PartChoice = 'hide' | 'show'
 
 export interface SkinPrefs {
-  /** Saved show/hide choices by node name, against the skin's default form. */
+  /** Saved show/hide choices by node name, against what the animation data says. */
   parts: Record<string, PartChoice>
 }
 

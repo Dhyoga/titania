@@ -10,7 +10,7 @@ import ModelTab from '~/components/ModelTab.vue'
 const { prefs, update, flush } = usePreferences()
 const frames = FRAMES.map((f) => ({ id: f.id, name: f.displayName }))
 
-// The panel always opens in Display, on the saved Display model (Crepuscule Generic - Final until the user chooses another).
+// The panel always opens in Display, on the saved Display model (the default model until the user chooses another).
 const mode = ref<Mode>('display')
 const displayModel = computed(() => resolveDisplayModel(FRAMES, prefs.value.lobby, DEFAULT_FRAME))
 // Playground starts from the Display model every time it is entered; what is chosen in it stays in it.

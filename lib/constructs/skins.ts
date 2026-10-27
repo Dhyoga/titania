@@ -10,11 +10,6 @@ export interface SkinConfig {
   group: SkinGroup
   /** Path of the skin's animation manifest under `/<constructId>/`, or null for a model without clips (the chibi). */
   manifest: string | null
-  /**
-   * Open in the model's Light form (form tags of the GLB, `lightFormChoices` in `lib/viewer/parts.ts`) instead of the form the
-   * animation data switches to: Crepuscule's Generic skins, whose Board actions otherwise show the black-inked dark veil.
-   */
-  lightForm?: boolean
 }
 
 export interface SkinAssets {

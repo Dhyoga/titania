@@ -73,20 +73,25 @@ test('bad fields fail with their path', () => {
   assert.throws(() => parseVoices([]), /\(root\): expected an object/)
 })
 
-// Real data: the shipped Crepuscule voices. Skipped when data/ is absent.
-const dataDir = new URL('../data/crepuscule/', import.meta.url)
-const skip = !existsSync(new URL('voices.json', dataDir)) && 'data/crepuscule is not present'
+// Real data: Shukra's and Pavo's voices. Skipped when data/ or a voices.json is absent. Which Board actions are paired is the table's
+// choice (`voice_pairings.json`), so this checks what must hold whatever it is.
+const frames = ['shukra', 'pavo'] as const
+const skip = !frames.every((f) => existsSync(new URL(`../data/${f}/voices.json`, import.meta.url))) && 'data/ or a voices.json is not present (run build_voices.py)'
 
-test('Crepuscule: exactly the ten Board actions are paired, and every paired file exists', { skip }, () => {
-  const v = parseVoices(JSON.parse(readFileSync(new URL('voices.json', dataDir), 'utf8')))
-  const manifest = parseManifest(JSON.parse(readFileSync(new URL('anim/manifest.json', dataDir), 'utf8')))
-  const board = manifest.clips.filter((c) => c.name.startsWith('BoardAct')).map((c) => c.name).sort()
-  assert.deepEqual([...v.byAnimation.keys()].sort(), board)
-  assert.equal(board.length, 10)
-  assert.equal(voiceAudioPath(v, voiceFor(v, 'BoardAct0201')!), 'voices_ja/v_biankasups_009_12.mp3')
-  assert.equal(voiceAudioPath(v, voiceFor(v, 'BoardAct1006')!), 'voices_ja/v_biankasups_019.mp3')
-  for (const entry of v.byAnimation.values()) assert.ok(existsSync(new URL(voiceAudioPath(v, entry), dataDir)), entry.file)
-  for (const name of ['UiStand1', 'StandAct0101', 'Stand1']) assert.equal(voiceFor(v, name), undefined)
+test('Shukra and Pavo: only Board actions of the frame are paired, and every paired file exists', { skip }, () => {
+  for (const frame of frames) {
+    const dataDir = new URL(`../data/${frame}/`, import.meta.url)
+    const v = parseVoices(JSON.parse(readFileSync(new URL('voices.json', dataDir), 'utf8')))
+    const manifest = parseManifest(JSON.parse(readFileSync(new URL('anim/manifest.json', dataDir), 'utf8')))
+    const board = new Set(manifest.clips.filter((c) => c.name.startsWith('BoardAct')).map((c) => c.name))
+    assert.ok(v.byAnimation.size > 0, `${frame}: no Board action is paired (see voice_pairings.json)`)
+    for (const clip of v.byAnimation.keys()) assert.ok(board.has(clip), `${frame}: ${clip} is not a Board action of the frame`)
+    for (const entry of v.byAnimation.values()) {
+      assert.ok(existsSync(new URL(voiceAudioPath(v, entry), dataDir)), `${frame}: ${entry.file}`)
+      assert.match(voiceAudioPath(v, entry), /^voices_ja\/v_qus?_/, 'the path is under voices_ja/')
+    }
+    for (const name of ['UiStand1', 'StandAct0101', 'Stand1']) assert.equal(voiceFor(v, name), undefined, `${frame} ${name}`)
+  }
 })
 
 test('keeps the transcript when there is one', () => {

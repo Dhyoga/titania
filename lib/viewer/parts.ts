@@ -94,27 +94,6 @@ export function hiddenNodeSet(manifestHidden: readonly number[], meshes: readonl
   return hidden
 }
 
-/**
- * Choices that put a model in its Light form, from the GLB's `scenes[0].extras.objectTags`: the `ModelCase` meshes listed in
- * `LightDisable` hidden (Crepuscule Generic: the dark veil `AlphaEX*`, thorn tattoos `BodyEX01`, cuffs `Band`, `BodyEX02`,
- * `FaceEX`), every other `ModelCase` mesh shown (the light veil and body a Board action's `stateHides` would hide). Empty for a
- * model without a `LightDisable` tag (the chibis, the other frames).
- */
-export function lightFormChoices(gltfJson: unknown, meshes: readonly Mesh[]): Record<string, MeshOverride> {
-  const tags = (gltfJson as { scenes?: { extras?: { objectTags?: unknown } }[] } | null)?.scenes?.[0]?.extras?.objectTags
-  if (!Array.isArray(tags)) return {}
-  const nodes = (name: string): Set<number> | null => {
-    const tag = tags.find((t): t is { name: string; nodes: number[] } => t?.name === name && Array.isArray(t.nodes))
-    return tag ? new Set(tag.nodes) : null
-  }
-  const disabled = nodes('LightDisable')
-  const cases = nodes('ModelCase')
-  if (!disabled || !cases) return {}
-  const choices: Record<string, MeshOverride> = {}
-  for (const mesh of meshes) if (cases.has(mesh.index)) choices[mesh.name] = disabled.has(mesh.index) ? 'hide' : 'show'
-  return choices
-}
-
 /** Whether a mesh is shown: the user's choice if there is one, else the manifest's list. */
 export function isMeshShown(mesh: Mesh, manifestHidden: ReadonlySet<number>, overrides: Readonly<Record<string, MeshOverride>>): boolean {
   const choice = overrides[mesh.name]
@@ -124,16 +103,15 @@ export function isMeshShown(mesh: Mesh, manifestHidden: ReadonlySet<number>, ove
 type Choices = Readonly<Record<string, MeshOverride>>
 
 /**
- * What "Save" stores for a skin (`user-preferences`): the shown state of the model's meshes (the unsaved choice, else what was saved)
- * minus what the default form already says, which is not stored. A saved name the model lacks is kept; an unsaved choice for a name it
- * lacks belongs to another model and is not saved here.
+ * What "Save" stores for a skin (`user-preferences`): the shown state of the model's meshes (the unsaved choice, else what was saved).
+ * A saved name the model lacks is kept; an unsaved choice for a name it lacks belongs to another model and is not saved here.
  */
-export function partsToSave(saved: Choices, unsaved: Choices, present: ReadonlySet<string>, formDefaults: Choices): Record<string, MeshOverride> {
+export function partsToSave(saved: Choices, unsaved: Choices, present: ReadonlySet<string>): Record<string, MeshOverride> {
   const next: Record<string, MeshOverride> = {}
   for (const [name, choice] of Object.entries(saved)) if (!present.has(name)) next[name] = choice
   for (const name of present) {
     const choice = unsaved[name] ?? saved[name]
-    if (choice !== undefined && formDefaults[name] !== choice) next[name] = choice
+    if (choice !== undefined) next[name] = choice
   }
   return next
 }

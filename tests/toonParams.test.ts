@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { materialRefs, pairOutlines, parseToonMaterial, type MaterialRef } from '../lib/viewer/toon/params.ts'
 
@@ -183,10 +183,10 @@ test('pairing: exact name, the pass run before, then looser names; never an outl
   )
 })
 
-// Real data: every material of every shipped model. Skipped without data/.
-const dataDir = new URL('../data/crepuscule/models/', import.meta.url)
-const skip = !existsSync(new URL('r5biankamd010011.glb', dataDir)) && 'data/crepuscule is not present'
-const MODELS = ['r5biankamd010011', 'r5biankamd010021', 'r5biankamd010031', 'r5biankamd019011', 'r5biankamd019241', 'r5biankamd019271', 'qr5biankamd010011_chibi']
+// Real data: every material of Shukra's and Pavo's Generic models. Skipped without data/.
+const MODELS = { shukra: 'r3qumd010011', pavo: 'r2qumd010011' } as const
+const frames = Object.keys(MODELS) as (keyof typeof MODELS)[]
+const skip = !frames.every((f) => existsSync(new URL(`../data/${f}/models/${MODELS[f]}.glb`, import.meta.url))) && 'data/ is not present'
 
 interface Gltf {
   materials: { name: string; extras?: { family?: string } }[]
@@ -195,8 +195,8 @@ interface Gltf {
   nodes: { name: string; mesh?: number }[]
 }
 
-function gltf(id: string): Gltf {
-  const b = readFileSync(new URL(`${id}.glb`, dataDir))
+function gltf(frame: keyof typeof MODELS): Gltf {
+  const b = readFileSync(new URL(`../data/${frame}/models/${MODELS[frame]}.glb`, import.meta.url))
   return JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString('utf8')) as Gltf
 }
 
@@ -212,169 +212,96 @@ function pairsByName(json: Gltf): Map<string, string | null> {
   return out
 }
 
-test('real models: every material parses; character and outline materials are drawn, passes are not', { skip }, () => {
-  for (const id of MODELS) {
-    const json = gltf(id)
+test('real models: every material parses; character and outline materials are drawn, passes (Shukra\'s `bloom`) are not', { skip }, () => {
+  for (const frame of frames) {
+    const json = gltf(frame)
     for (const material of json.materials) {
       const p = parseToonMaterial(material, json.textures)
       const family = material.extras?.family
       if (family === 'character' || family === 'outline') {
-        assert.ok(p, `${id} ${material.name}`)
+        assert.ok(p, `${frame} ${material.name}`)
         for (const slot of Object.values(p.textures)) assert.ok(slot.index < json.textures.length)
       } else {
-        assert.equal(p, null, `${id} ${material.name}`)
+        assert.equal(p, null, `${frame} ${material.name} (${family})`)
       }
     }
     // Every material on a mesh is a character material.
-    for (const mesh of json.meshes) for (const prim of mesh.primitives) assert.equal(json.materials[prim.material ?? -1]?.extras?.family, 'character', id)
+    for (const mesh of json.meshes) for (const prim of mesh.primitives) assert.equal(json.materials[prim.material ?? -1]?.extras?.family, 'character', frame)
   }
 })
 
 test('real models: PBR and matcap materials on meshes', { skip }, () => {
   const counts = { full: 0, simple: 0, matcap: 0 }
-  for (const id of MODELS) {
-    const json = gltf(id)
+  for (const frame of frames) {
+    const json = gltf(frame)
     const used = new Set(json.meshes.flatMap((m) => m.primitives.map((p) => p.material ?? -1)))
     for (const index of used) {
       const p = parseToonMaterial(json.materials[index], json.textures)
       if (p?.pbr) counts[p.pbr.mode]++
       if (p?.matcap) counts.matcap++
-      if (p?.pbr?.mode === 'full') assert.ok(p.textures._PBRMask, `${id} ${p.name} has a PBR mask`)
+      if (p?.pbr?.mode === 'full') assert.ok(p.textures._PBRMask, `${frame} ${p.name} has a PBR mask`)
     }
   }
-  assert.deepEqual(counts, { full: 62, simple: 14, matcap: 13 })
-  const final = gltf('r5biankamd010031')
-  const down = final.materials.find((m) => m.name === 'R5BiankaMd010031Down')
-  const p = parseToonMaterial(down, final.textures)
-  assert.equal(p?.pbr?.metallic, 1)
-  assert.equal(p?.pbr?.roughness, 0)
+  assert.deepEqual(counts, { full: 4, simple: 2, matcap: 3 })
+  const near = (a: number | undefined, b: number) => assert.ok(a !== undefined && Math.abs(a - b) < 1e-3, `${a} is not ${b}`)
+  const shukra = gltf('shukra')
+  const weapon = parseToonMaterial(shukra.materials.find((m) => m.name === 'R3QuMd010011Weapon'), shukra.textures)
+  assert.equal(weapon?.pbr?.mode, 'full')
+  near(weapon?.pbr?.metallic, 0.965)
+  near(weapon?.pbr?.roughness, 0.213)
+  const huangyu = parseToonMaterial(shukra.materials.find((m) => m.name === 'R3QuMd010011Huangyu'), shukra.textures)
+  assert.equal(huangyu?.pbr?.mode, 'simple')
+  near(huangyu?.pbr?.metallic, 1)
 })
 
 test('real models: outline pairs', { skip }, () => {
-  const def = pairsByName(gltf('r5biankamd010011'))
-  assert.equal(def.get('R5BiankaMd010011Hair01'), 'R5BiankaMd010011HairOL')
-  assert.equal(def.get('R5BiankaMd010011Hair02'), 'R5BiankaMd010011HairOL')
-  assert.equal(def.get('R5BiankaMd010011BodyEX01'), 'R5BiankaMd010011BodyOL')
-  assert.equal(def.get('R5BiankaMd010011Face'), 'R5BiankaMd010011FaceOL')
-  assert.equal(def.get('R5BiankaMd010011FaceEX'), 'R5BiankaMd010011FaceOL')
-  for (const veil of ['Alpha', 'Alpha01', 'AlphaEX', 'AlphaEX01']) assert.equal(def.get(`R5BiankaMd010011${veil}`), null, veil)
-  assert.equal(def.get('R5BiankaMd010011Eye'), null)
-  assert.equal(def.get('R5BiankaMd010011Shade'), null)
+  const shukra = pairsByName(gltf('shukra'))
+  for (const part of ['Body', 'Down', 'Face', 'Hair01', 'Hair02', 'Huangyu', 'Upper', 'Weapon']) {
+    assert.equal(shukra.get(`R3QuMd010011${part}`), `R3QuMd010011${part}OL`, part)
+  }
+  assert.equal(shukra.get('R3QuMd010011Alpha'), null)
+  assert.equal(shukra.get('R3QuMd010011Eye'), null)
 
-  const final = pairsByName(gltf('r5biankamd010031'))
-  assert.equal(final.get('R5BiankaMd010031Body'), 'R5BiankaMd010011BodyOL', 'Generic - Final shares the default outlines')
-
-  const sonata = pairsByName(gltf('r5biankamd019241'))
-  assert.equal(sonata.get('R5BiankaMd019241Upper'), 'R5BiankaMd019241UpperOL')
-  assert.equal(sonata.get('R5BiankaMd019241UpperEX'), 'R5BiankaMd019241UpperEXOL')
-  assert.equal(sonata.get('R5BiankaMd019241Hair01'), 'R5BiankaMd019241Hair01OL')
-  assert.equal(sonata.get('R5BiankaMd019241Hair02'), 'R5BiankaMd019241Hair01OL')
-  assert.equal(sonata.get('R5BiankaMd019241Alpha01'), 'R5BiankaMd019241Alpha01OL')
-
-  const tides = pairsByName(gltf('r5biankamd019271'))
-  assert.equal(tides.get('R5BiankaMd019271Alpha_1'), null, 'AlphaOL is written after Alpha_1, so it is not its outline')
-  assert.equal(tides.get('R5BiankaMd019271Alpha_2'), 'R5BiankaMd019271AlphaOL')
-  assert.equal(tides.get('R5BiankaMd019271Cloth02_3'), 'R5BiankaMd019271Cloth02OL')
-
-  assert.equal(pairsByName(gltf('qr5biankamd010011_chibi')).get('QR5BiankaMd010011'), 'QR5BiankaMd010011OL')
+  const pavo = pairsByName(gltf('pavo'))
+  for (const part of ['Bead', 'Body', 'Cloth', 'Face', 'Head']) assert.equal(pavo.get(`R2QuMd010011${part}`), `R2QuMd010011${part}OL`, part)
+  assert.equal(pavo.get('R2QuMd010011Hair01'), 'R2QuMd010011HairOL', 'both hair meshes share one outline')
+  assert.equal(pavo.get('R2QuMd010011Hair02'), 'R2QuMd010011HairOL')
+  assert.equal(pavo.get('R2QuMd010011Eye'), null)
 })
 
-test('real models: meshes with an outline, per skin', { skip }, () => {
+test('real models: meshes with an outline, per model', { skip }, () => {
   const counts: Record<string, string> = {}
-  for (const id of MODELS) {
-    const json = gltf(id)
+  for (const frame of frames) {
+    const json = gltf(frame)
     const pairs = pairOutlines(materialRefs(json.materials))
     const meshes = json.nodes.filter((n) => n.mesh !== undefined)
     const outlined = meshes.filter((n) => json.meshes[n.mesh!]!.primitives.some((p) => pairs.has(p.material ?? -1)))
-    counts[id] = `${outlined.length}/${meshes.length}`
+    counts[frame] = `${outlined.length}/${meshes.length}`
   }
-  assert.deepEqual(counts, {
-    r5biankamd010011: '11/17',
-    r5biankamd010021: '11/17',
-    r5biankamd010031: '11/17',
-    r5biankamd019011: '14/16',
-    r5biankamd019241: '20/43',
-    r5biankamd019271: '18/21',
-    qr5biankamd010011_chibi: '1/1',
-  })
+  assert.deepEqual(counts, { shukra: '8/10', pavo: '7/8' })
 })
 
-test('real models of Stigmata, Veritas and Zero: every material parses; meshes use character, effectCharacter or fur materials', { skip: !existsSync(new URL('../data/stigmata/models/r4biankamd010031.glb', import.meta.url)) && 'data/ is not present' }, () => {
-  let materials = 0
-  let withOutline = 0
-  let meshMaterials = 0
-  let untoned = 0
-  for (const frame of ['stigmata', 'veritas', 'zero']) {
-    const dir = new URL(`../data/${frame}/models/`, import.meta.url)
-    for (const file of readdirSync(dir).filter((f) => f.endsWith('.glb'))) {
-      const b = readFileSync(new URL(file, dir))
-      const json = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString('utf8')) as Gltf
-      for (const material of json.materials) {
-        const p = parseToonMaterial(material, json.textures)
-        const family = material.extras?.family
-        if (family === 'character' || family === 'outline' || family === 'effectCharacter') {
-          assert.ok(p, `${frame}/${file} ${material.name}`)
-          for (const slot of Object.values(p.textures)) assert.ok(slot.index < json.textures.length, `${frame}/${file} ${material.name}`)
-          materials++
-        } else {
-          assert.equal(p, null, `${frame}/${file} ${material.name}`)
-        }
-      }
-      const pairs = pairOutlines(materialRefs(json.materials))
-      for (const mesh of json.meshes) {
-        for (const prim of mesh.primitives) {
-          meshMaterials++
-          // `effectCharacter` (Stigmata's veils) is toon-shaded as its character layer (H17); `fur` (Veritas' and Zero's) is not:
-          // those meshes keep their glTF material (known gap, AGENTS.md "Not built").
-          const family = json.materials[prim.material ?? -1]?.extras?.family
-          assert.ok(['character', 'effectCharacter', 'fur'].includes(family ?? ''), `${frame}/${file}: family ${family}`)
-          if (family === 'fur') untoned++
-          if (pairs.has(prim.material ?? -1)) withOutline++
-        }
-      }
-    }
-  }
-  assert.ok(materials > 100, `only ${materials} materials checked`)
-  assert.ok(withOutline > 0 && withOutline <= meshMaterials, 'some meshes have an outline')
-  assert.ok(untoned > 0 && untoned < meshMaterials / 4, `${untoned} of ${meshMaterials} mesh materials keep the glTF material`)
-})
-
-test('real models of the four frames: emission, colour ramps, zones, matcap and effect veils on meshes', { skip: !existsSync(new URL('../data/stigmata/models/r4biankamd010031.glb', import.meta.url)) && 'data/ is not present' }, () => {
+test('real models: emission, colour ramps, zones and matcap on meshes', { skip }, () => {
   const counts: Record<string, Record<string, number>> = {}
-  for (const frame of ['crepuscule', 'stigmata', 'veritas', 'zero']) {
-    const dir = new URL(`../data/${frame}/models/`, import.meta.url)
+  for (const frame of frames) {
+    const json = gltf(frame)
     const c = { emission: 0, flowing: 0, matcap: 0, skinRamp: 0, multiSkin: 0, shadowSets: 0, effect: 0 }
-    for (const file of readdirSync(dir).filter((f) => f.endsWith('.glb'))) {
-      const b = readFileSync(new URL(file, dir))
-      const json = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString('utf8')) as Gltf
-      const used = new Set(json.meshes.flatMap((m) => m.primitives.map((p) => p.material ?? -1)))
-      for (const index of used) {
-        const p = parseToonMaterial(json.materials[index], json.textures)
-        if (!p) continue
-        if (p.family === 'effectCharacter') c.effect++
-        if (p.emission) c.emission++
-        if (p.emission?.flowing) c.flowing++
-        if (p.matcap) c.matcap++
-        if (p.skinRamp) c.skinRamp++
-        if (p.skinRamp?.multi) c.multiSkin++
-        if (p.shadowSets) c.shadowSets++
-      }
+    const used = new Set(json.meshes.flatMap((m) => m.primitives.map((p) => p.material ?? -1)))
+    for (const index of used) {
+      const p = parseToonMaterial(json.materials[index], json.textures)
+      if (!p) continue
+      if (p.family === 'effectCharacter') c.effect++
+      if (p.emission) c.emission++
+      if (p.emission?.flowing) c.flowing++
+      if (p.matcap) c.matcap++
+      if (p.skinRamp) c.skinRamp++
+      if (p.skinRamp?.multi) c.multiSkin++
+      if (p.shadowSets) c.shadowSets++
     }
     counts[frame] = c
   }
   assert.deepEqual(counts, {
-    crepuscule: { emission: 27, flowing: 3, matcap: 13, skinRamp: 73, multiSkin: 13, shadowSets: 7, effect: 0 },
-    stigmata: { emission: 12, flowing: 1, matcap: 9, skinRamp: 30, multiSkin: 8, shadowSets: 3, effect: 9 },
-    veritas: { emission: 7, flowing: 0, matcap: 1, skinRamp: 16, multiSkin: 0, shadowSets: 0, effect: 0 },
-    zero: { emission: 1, flowing: 0, matcap: 0, skinRamp: 3, multiSkin: 0, shadowSets: 0, effect: 0 },
+    shukra: { emission: 3, flowing: 0, matcap: 2, skinRamp: 7, multiSkin: 2, shadowSets: 0, effect: 0 },
+    pavo: { emission: 0, flowing: 0, matcap: 1, skinRamp: 2, multiSkin: 0, shadowSets: 0, effect: 0 },
   })
-
-  // Stigmata's suit: four ramp bands with their own rates, two colour sets in use.
-  const b = readFileSync(new URL('../data/stigmata/models/r4biankamd010031.glb', import.meta.url))
-  const json = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString('utf8')) as Gltf
-  const cloth = parseToonMaterial(json.materials.find((m) => m.name === 'R4BiankaMd010011Cloth'), json.textures)
-  assert.equal(cloth?.emission?.intensity, 5)
-  assert.equal(cloth?.skinRamp?.multi, true)
-  assert.deepEqual(cloth?.skinRamp?.zoneRates.map((r) => Math.round(r * 100)), [45, 0, 20, 28])
-  assert.equal(cloth?.shadowSets?.length, 4)
 })

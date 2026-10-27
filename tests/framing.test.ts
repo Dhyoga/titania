@@ -25,7 +25,8 @@ test('very narrow canvas is limited by width, through the width share', () => {
   assert.ok(full.distance > narrow.distance, 'a share of 1 keeps the whole width in view, so it stands farther back')
 })
 
-// Crepuscule's bounds (bind pose, A-pose arms): about 1.04 m wide, 1.9 m tall, 0.6 m deep.
+// A person's bounds (bind pose, A-pose arms), as measured on Bianca's Crepuscule in the PGR companion: about 1.04 m wide, 1.9 m tall,
+// 0.6 m deep. Qu's own bounds are measured in AGENTS.md; this test needs a fixed number, not the real one.
 const person = { min: { x: -0.52, y: 0, z: -0.3 }, max: { x: 0.52, y: 1.9, z: 0.3 } }
 
 test('a person is framed closer than the full-body fit in a narrow panel (the 387 x 1045 reference)', () => {

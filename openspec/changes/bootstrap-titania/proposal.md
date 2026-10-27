@@ -56,7 +56,7 @@ stay until `erza-only-companion` replaces them), `viewer-display`, `viewer-toolb
 
 - The whole repository is new here; the code is changed only where it names Bianca's frames (`lib/constructs/*`, `lib/anim/catalog.ts`,
   `lib/anim/names.ts`, `lib/prefs/prefs.ts`, `wxt.config.ts`, a few tests and components).
-- `data/shukra/` and `data/pavo/` are downloaded (git-ignored, never committed): Generic GLBs of 5.6 and 3.4 MB plus clips, icons and
+- `data/shukra/` and `data/pavo/` are downloaded (git-ignored, never committed): Generic GLBs of 11.1 and 5.3 MB on disk (the manifests' `modelStoredBytes`, 5.6 and 3.4 MB, is the stored size) plus clips, icons and
   voices; total size recorded in `AGENTS.md` after the download.
 - The Erza source folders already in this directory are left untouched until `add-erza-model`.
 - No new dependencies.

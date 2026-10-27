@@ -10,3 +10,4 @@ dist/
 reference/
 # Erza source models (game assets): personal use only, never commit or distribute
 Erza Scarlet*/
+__pycache__/

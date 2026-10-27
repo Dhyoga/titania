@@ -14,7 +14,7 @@ Facts about Qu already measured (huaxu manifests and the JSON chunk of each Gene
 
 | | Shukra (`shukra`) | Pavo (`pavo`) |
 |---|---|---|
-| Generic prefab | `r3qumd010011`, 5.6 MB | `r2qumd010011`, 3.4 MB |
+| Generic prefab | `r3qumd010011`, 11.1 MB (5.6 stored) | `r2qumd010011`, 5.3 MB (3.4 stored) |
 | Clips in `anim/manifest.json` | 70 (`BaseLayer` 56, `LevelCombine1Level1` 13, `UiStand1`) | 100 (`BaseLayer` 49, `Base Layer` 11, `LevelCombine1Level1` 27, `LevelCombine1Level2` 11, `UiStand1`, `UiStand1_2`) |
 | `rootNode` | 1 = `Bip001` on every clip | same |
 | Menu list (PGR `buildCatalog`) | Idle: `StandAct0101`, `UiStand1`; Board actions: `BoardAct0201`–`0203`, `1001`–`1007` | same |
@@ -90,7 +90,8 @@ D4: an unpaired action is neither played in Display nor offered in the popover.
 
 Nothing in the data links a Board action to a line (checked: the voices page payload and the manifests' `eventTables`, which hold only
 `stopAnimNames` and state-sync flags). The pairing is made by hand per frame: candidates are the lines whose Japanese audio length is close
-to the clip's (a clip of 17.8 to 41.8 s carries a line much shorter than itself, so length narrows rather than decides), then confirmed by
+to the clip's (length narrows rather than decides; **take it by decoding the file**: ffprobe reads these VBR MP3s up to 2× too long, which
+misled the first draft. With the user's final pairs every line ends before its clip, except Shukra's `BoardAct1004`, 41.9 s against 41.8 s), then confirmed by
 playing the clip with the candidate line in Playground. A clip without a confident pairing gets no entry and plays silently. The table's
 `_comment` records how pairs were chosen. This is the only step of the change that needs the user's ear; the rest is mechanical.
 

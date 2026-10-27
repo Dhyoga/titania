@@ -58,14 +58,16 @@ test('speechSpan finds where the sound starts and stops', () => {
   assert.deepEqual(speechSpan([new Float32Array(300)], rate), { start: 0, end: 3 })
 })
 
-test('every shipped paired line gets cues of readable length', { skip: !existsSync('data/crepuscule/voices.json') }, () => {
-  const raw = JSON.parse(readFileSync('data/crepuscule/voices.json', 'utf8')) as { entries: { animation?: string; text?: string }[] }
-  const paired = raw.entries.filter((e) => e.animation && e.text)
-  assert.equal(paired.length, 10)
-  for (const e of paired) {
-    const cues = buildCues(e.text!, 30, { start: 0.3, end: 29 })
-    assert.ok(cues.length >= 1 && cues.length <= 8, `${e.animation}: ${cues.length} cues`)
-    assert.ok(cues.every((c) => c.text.length <= 140 && c.end > c.start), e.animation!)
-    assert.equal(cues.map((c) => c.text).join(' '), e.text!.replace(/\s+/g, ' ').trim(), e.animation!)
+test('every shipped paired line gets cues of readable length', { skip: !['shukra', 'pavo'].every((f) => existsSync(`data/${f}/voices.json`)) }, () => {
+  for (const frame of ['shukra', 'pavo']) {
+    const raw = JSON.parse(readFileSync(`data/${frame}/voices.json`, 'utf8')) as { entries: { animation?: string; text?: string }[] }
+    const paired = raw.entries.filter((e) => e.animation && e.text)
+    assert.ok(paired.length > 0, `${frame}: no paired line with a text`)
+    for (const e of paired) {
+      const cues = buildCues(e.text!, 30, { start: 0.3, end: 29 })
+      assert.ok(cues.length >= 1 && cues.length <= 8, `${frame} ${e.animation}: ${cues.length} cues`)
+      assert.ok(cues.every((c) => c.text.length <= 140 && c.end > c.start), `${frame} ${e.animation}`)
+      assert.equal(cues.map((c) => c.text).join(' '), e.text!.replace(/\s+/g, ' ').trim(), `${frame} ${e.animation}`)
+    }
   }
 })

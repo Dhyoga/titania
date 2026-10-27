@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Download animation clips into data/<slug>/anim/ (base skin) or data/<slug>/anim-skins/<prefab>/ (--skins).
+"""Download animation clips into data/<slug>/anim/ (the Generic skin of each frame in PREFABS).
 
 The clip list comes from each prefab's manifest.json (the same file the wiki's model viewer reads); the files are
 fetched one by one with a pause between requests, are validated as JSON, and existing valid files are skipped, so the
 script can be re-run after an interruption. Personal use only (Kuro Games' assets). Output is git-ignored.
 
-Usage: python3 download_animations.py [slug ...] [--skins] [--delay 0.25]
-  (default)  the base skin of each character -> data/<slug>/anim/
-  --skins    every OTHER skin prefab of each character -> data/<slug>/anim-skins/<prefab>/
+Usage: python3 download_animations.py [slug ...] [--delay 0.25]
+  (default)  the Generic skin of each frame (shukra, pavo) -> data/<slug>/anim/
+  --skins    kept for the layout of anim-skins/, but SKIN_PREFABS is empty here (no other skin is used), so it downloads nothing
 Clips of one skin only fit the model of that skin (same clip names differ in content between skins).
 """
 import argparse
@@ -19,30 +19,15 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from download_construct import PREFABS
+
 BASE = "https://assets.huaxu.app/models/charaterprefab"
 HEADERS = {"User-Agent": "Mozilla/5.0"}
 
-# Generic skin of each character, the model variant used by this project.
-PREFABS = {
-    "crepuscule": "r5biankamd010011",
-    "zero": "r2biankamd010011",
-    "veritas": "r3biankamd010011",
-    "stigmata": "r4biankamd010011",
-    "solacetune": "r3hanyingmd010011",
-    "zitherwoe": "r2hanyingmd010011",
-    "dirge": "r3nietiyamd010011",
-}
-
-# Every skin prefab per character (from the model pages of the wiki). The base skin is PREFABS[slug].
-SKIN_PREFABS = {
-    "crepuscule": ["r5biankamd010021", "r5biankamd010031", "r5biankamd019011", "r5biankamd019241", "r5biankamd019271"],
-    "zero": ["r2biankamd010021", "r2biankamd010031", "r2biankamd019011", "r2biankamd019071"],
-    "veritas": ["r3biankamd010021", "r3biankamd010031", "r3biankamd019101", "r3biankamd019131", "r3biankamd019141", "r3biankamd019191"],
-    "stigmata": ["q4biankamd010011", "r4biankamd010021", "r4biankamd010031", "r4biankamd019011", "r4biankamd019241", "r4biankamd019281"],
-    "solacetune": ["r3hanyingmd010021", "r3hanyingmd010031", "r3hanyingmd019011", "r3hanyingmd019021", "r3hanyingmd019141"],
-    "zitherwoe": ["r2hanyingmd010021", "r2hanyingmd010031", "r2hanyingmd019011", "r2hanyingmd019141"],
-    "dirge": ["r3nietiyamd010021", "r3nietiyamd010031", "r3nietiyamd019011", "r3nietiyamd019421"],
-}
+# PREFABS (imported above) is the Generic skin of each frame: one table with download_construct.py, which downloads the model of
+# the same prefab.
+# Other skin prefabs per frame: none are used (Qu's models are not shown beyond their Generic skin), so --skins does nothing.
+SKIN_PREFABS = {}
 
 
 def fetch(url, retries=4, total=120):
@@ -130,7 +115,7 @@ def main():
     failed = []
     for slug in args.slugs or PREFABS:
         if args.skins:
-            for prefab in SKIN_PREFABS[slug]:
+            for prefab in SKIN_PREFABS.get(slug, []):
                 download_prefab(slug, prefab, Path(args.out) / slug / "anim-skins" / prefab, args.delay, failed)
         else:
             download_prefab(slug, PREFABS[slug], Path(args.out) / slug / "anim", args.delay, failed)

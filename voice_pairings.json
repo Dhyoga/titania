@@ -1,51 +1,27 @@
 {
-  "_comment": "Board action -> huaxu line title, per frame (slug). Read by build_voices.py. Titles are exactly as the frame's huaxu voices page spells them. A clip with no line yet (Veritas BoardAct0202/0203, Crepuscule BoardAct0204/0205) has no entry. crepuscule is only used to check the builder (build_voices.py --check crepuscule); its shipped data/crepuscule/voices.json is never regenerated.",
-  "crepuscule": {
-    "BoardAct0201": "General Greeting 12",
-    "BoardAct0202": "General Greeting 6",
-    "BoardAct0203": "General Greeting 14",
-    "BoardAct1001": "Affection Up 14",
-    "BoardAct1002": "Quick Tap 3",
-    "BoardAct1003": "Shake 3",
-    "BoardAct1004": "Connection Made 7",
-    "BoardAct1005": "Idle 5",
-    "BoardAct1006": "Extended Offline Time",
-    "BoardAct1007": "Extended Connection 5"
-  },
-  "stigmata": {
-    "BoardAct0201": "General Greeting 6",
+  "_comment": "Board action -> huaxu line title, per frame (slug). Read by build_voices.py. Titles are exactly as the frame's huaxu voices page spells them. A clip with no line chosen has no entry. Qu's data holds no clip <-> line link (checked: the voices page payload and the manifests' eventTables), so these pairs were chosen by listening: each clip played with its candidate line in Playground, by the user. Audio length (taken by decoding the file: ffprobe overestimates these VBR MP3s up to 2x) only narrows the choice, but the pairs agree with it: every line ends before its clip except Shukra's BoardAct1004, which outlasts it by 0.1 s (41.9 s against 41.8 s).",
+  "shukra": {
+    "BoardAct0201": "General Greeting 11",
     "BoardAct0202": "General Greeting 12",
-    "BoardAct0203": "General Greeting 14",
-    "BoardAct1001": "Affection Up 13",
-    "BoardAct1002": "Quick Tap 1",
-    "BoardAct1003": "Shake 3",
-    "BoardAct1004": "Connection Made 6",
+    "BoardAct0203": "General Greeting 15",
+    "BoardAct1001": "Affection Up 16",
+    "BoardAct1002": "Quick Tap 3",
+    "BoardAct1003": "Shake 2",
+    "BoardAct1004": "Connection Made 8",
     "BoardAct1005": "Idle 4",
     "BoardAct1006": "Extended Offline Time",
-    "BoardAct1007": "Extended Connection 2",
-    "BoardAct10021": "General Greeting 16",
-    "BoardAct10022": "Connection Made 9"
+    "BoardAct1007": "Extended Connection 4"
   },
-  "veritas": {
-    "BoardAct0201": "General Greeting 2",
-    "BoardAct1001": "Affection Up 2",
-    "BoardAct1002": "Quick Tap 4",
-    "BoardAct1003": "Shake 4",
+  "pavo": {
+    "BoardAct0201": "General Greeting 1",
+    "BoardAct0202": "General Greeting 9",
+    "BoardAct0203": "General Greeting 12",
+    "BoardAct1001": "Affection Up 12",
+    "BoardAct1002": "Quick Tap 2",
+    "BoardAct1003": "Shake 3",
     "BoardAct1004": "Connection Made 4",
-    "BoardAct1005": "Idle 3",
+    "BoardAct1005": "Idle 4",
     "BoardAct1006": "Extended Offline Time 1",
-    "BoardAct1007": "Extended Connection 2"
-  },
-  "zero": {
-    "BoardAct0201": "General Greeting 4",
-    "BoardAct0202": "General Greeting 5",
-    "BoardAct0203": "General Greeting 2",
-    "BoardAct1001": "Affection Up 1",
-    "BoardAct1002": "Quick Tap 4",
-    "BoardAct1003": "Shake 2",
-    "BoardAct1004": "Connection Made 1",
-    "BoardAct1005": "Idle 1",
-    "BoardAct1006": "Extended Offline Time 1",
-    "BoardAct1007": "Excessive Online Time 4"
+    "BoardAct1007": "Extended Connection 4"
   }
 }

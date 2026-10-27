@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import { screenshotName } from '../lib/viewer/screenshotName.ts'
 
 test('construct, skin, clip and time in seconds with two decimals', () => {
-  assert.equal(screenshotName({ construct: 'crepuscule', skin: 'r5biankamd010011', clip: 'BoardAct0201', time: 12.3 }), 'crepuscule_r5biankamd010011_BoardAct0201_12.30s.png')
+  assert.equal(screenshotName({ construct: 'shukra', skin: 'r3qumd010011', clip: 'BoardAct0201', time: 12.3 }), 'shukra_r3qumd010011_BoardAct0201_12.30s.png')
   assert.equal(screenshotName({ construct: 'c', skin: 's', clip: 'UiStand1', time: 0 }), 'c_s_UiStand1_0.00s.png')
   assert.equal(screenshotName({ construct: 'c', skin: 's', clip: 'UiStand1', time: 20.566669 }), 'c_s_UiStand1_20.57s.png')
 })

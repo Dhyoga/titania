@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Build data/<slug>/voices.json from the saved huaxu voices page, the voices_ja/ folder and voice_pairings.json.
 
-Usage: python3 build_voices.py stigmata veritas zero [--data data] [--pairings voice_pairings.json]
-       python3 build_voices.py --check crepuscule      (compare with the shipped file, ignoring entry order; write nothing)
+Usage: python3 build_voices.py shukra pavo [--data data] [--pairings voice_pairings.json]
 
 One entry per file in voices_ja/, in file stem order. A file that a line of the page links as its Japanese audio gets that
 line's title and English text; any other file gets an empty text and a note. The Board action pairing (`animation`) comes only
 from voice_pairings.json (clip name -> line title): a title that matches no line, or more than one, or a line claimed by two
-clips, is an error, and nothing is written for that frame. Crepuscule's shipped file is never regenerated (only --check).
+clips, is an error, and nothing is written for that frame.
 """
 import argparse
 import json
@@ -87,7 +86,7 @@ def build(slug, root, pairings):
             problems.append(f"{clip} and {claimed[entry['id']]} are both paired with {title!r}")
             continue
         claimed[entry["id"]] = clip
-        # `animation` sits after `file`, as in Crepuscule's file.
+        # `animation` sits right after `file`.
         position = list(entry).index("file") + 1
         items = list(entry.items())
         items.insert(position, ("animation", clip))
@@ -99,11 +98,6 @@ def build(slug, root, pairings):
     return {"version": 1, "audioLang": "ja", "textLang": "en", "entries": entries}
 
 
-def by_id(data):
-    """Content without the order of the entries (the shipped Crepuscule file keeps the file browser's order)."""
-    return {**{k: v for k, v in data.items() if k != "entries"}, "entries": {e["id"]: e for e in data["entries"]}}
-
-
 def render(data):
     return json.dumps(data, ensure_ascii=False, indent=2) + "\n"
 
@@ -113,7 +107,6 @@ def main():
     ap.add_argument("slugs", nargs="+")
     ap.add_argument("--data", default="data")
     ap.add_argument("--pairings", default=str(Path(__file__).with_name("voice_pairings.json")))
-    ap.add_argument("--check", action="store_true", help="compare with the existing voices.json instead of writing it")
     args = ap.parse_args()
 
     pairings = json.loads(Path(args.pairings).read_text(encoding="utf-8"))
@@ -125,15 +118,6 @@ def main():
             text = render(build(slug, root, pairings))
         except FrameError as e:
             print(f"ERROR {e}", file=sys.stderr)
-            failed = True
-            continue
-        if args.check:
-            same = target.is_file() and by_id(json.loads(target.read_text(encoding="utf-8"))) == by_id(json.loads(text))
-            print(f"{slug}: {'identical to' if same else 'DIFFERS from'} {target}")
-            failed |= not same
-            continue
-        if slug == "crepuscule":
-            print("ERROR crepuscule: its shipped voices.json is not regenerated (use --check)", file=sys.stderr)
             failed = True
             continue
         target.write_text(text, encoding="utf-8")

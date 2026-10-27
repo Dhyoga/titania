@@ -12,7 +12,7 @@ defineProps<{
   isShown: (mesh: Mesh) => boolean
   /** There are unsaved choices (Reset drops them, also those for names this model lacks). */
   anyChanged: boolean
-  /** An unsaved choice changes this model: one that differs from what is saved for the skin, else from its default form. */
+  /** An unsaved choice changes this model: one that differs from what is saved for the skin. */
   canSave: boolean
   /** Something is saved for the shown skin. */
   hasSaved: boolean
