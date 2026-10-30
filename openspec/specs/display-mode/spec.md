@@ -88,10 +88,6 @@ replaced by the default without an error.
 - **WHEN** the Model popover is opened, Stigmata is chosen and then Solitary Dream
 - **THEN** Display shows Stigmata Solitary Dream, and the next open of the panel shows it too
 
-#### Scenario: No chibi
-- **WHEN** the Model popover lists Crepuscule's skins
-- **THEN** the six skins without the chibi are listed
-
 #### Scenario: Unknown saved model
 - **WHEN** the saved Display model names a skin id that no frame has
 - **THEN** the panel opens on Crepuscule Generic - Final

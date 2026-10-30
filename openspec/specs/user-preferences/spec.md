@@ -43,10 +43,6 @@ every animation state, with the user's unsaved choices on top, and SHALL NOT cha
 remove what is saved for the shown skin only. A node name the shown model lacks SHALL be ignored and kept. Saved choices SHALL be kept
 for one skin at a time: saving one skin SHALL NOT change another.
 
-#### Scenario: Hide the hat for good
-- **WHEN** Sunlit Tides is shown, its `Hat` is switched off in the Parts popover, "Save" is pressed, and the panel is closed and opened again with Sunlit Tides selected
-- **THEN** the hat is hidden from the first frame, and its switch is off
-
 #### Scenario: Other skins unaffected
 - **WHEN** the hat of Sunlit Tides is saved off and Night Sonata is shown
 - **THEN** Night Sonata's meshes follow its own saved choices, else the animation data
@@ -123,10 +119,6 @@ the animation choices) SHALL be accepted and give the defaults for what it lacks
 - **WHEN** preferences are exported, forgotten, and the file is imported
 - **THEN** the saved camera, the Display model, camera and animation choices, parts and display settings are back and applied
 
-#### Scenario: Older file
-- **WHEN** a file exported before this change is imported
-- **THEN** it is accepted, its settings apply, and the Display animation choices are every frame's default
-
 #### Scenario: Wrong file
 - **WHEN** a file that is not a preferences record is imported
 - **THEN** a message says so and nothing changes
@@ -143,10 +135,6 @@ as it is chosen; the Display camera when "Save" or "Use built-in" is pressed whi
 and forgotten by "Use default". A record without them, or with a value of the wrong shape, SHALL give the defaults for them (Crepuscule
 Generic - Final, the built-in bust framing, each frame's default animations) without affecting the other preferences. A stored animation
 that the shown model's frames do not offer SHALL be ignored and kept.
-
-#### Scenario: Older record
-- **WHEN** the stored record was written before this change
-- **THEN** the panel opens on Crepuscule Generic - Final with the built-in bust framing and the default animations, and the saved parts, camera and display settings still apply
 
 #### Scenario: Wrong shape
 - **WHEN** the stored Display camera is a string

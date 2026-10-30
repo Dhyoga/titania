@@ -1,11 +1,9 @@
 ## ADDED Requirements
 
 ### Requirement: Diffuse and shadow-colour shading for a model without PGR parameters
-A material whose extras name the family `diffuseShadow` (a base-colour texture and a shadow-colour texture with the same UV layout) SHALL be drawn with a
-toon material that, per fragment, shows the shadow-colour texture where the surface faces away from the light and the base-colour texture where it
-faces it, with a soft transition a few percent of N·L wide. It SHALL use the light direction and intensity of the Lighting popover, and nothing from the
-PGR parameters (no colour ramp, mask, PBR, matcap or emission). Models whose materials carry PGR parameters SHALL be drawn exactly as before. The toon
-switch SHALL show the model's own glTF material (its base-colour texture) at once and without reloading, as for every model.
+A material whose extras name the family `diffuseShadow` (a base-colour and a shadow-colour texture with one UV layout) SHALL be drawn showing the shadow-colour
+texture where the surface faces away from the light and the base-colour texture where it faces it, with a soft edge a few percent of N·L wide, using the Lighting
+popover's light and nothing from the PGR parameters. Models with PGR parameters SHALL be drawn exactly as before.
 
 #### Scenario: Lit and shadow
 - **WHEN** Erza is shown with the light from the front (azimuth 0)

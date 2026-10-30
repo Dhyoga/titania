@@ -32,10 +32,6 @@ as `text` with `lang` `en`; otherwise the entry SHALL carry an empty `text` and 
 - **WHEN** two lines of the page link the same Japanese file with the same text (Veritas' and Zero's "Battle over" and "Battle Over")
 - **THEN** the entry carries the title and text of the first of them in page order and the script prints a note; if their texts differ the script stops with an error naming both titles
 
-#### Scenario: Same format as Crepuscule
-- **WHEN** the script is run on Crepuscule's saved page and audio folder with Crepuscule's pairings
-- **THEN** its output equals the shipped `data/crepuscule/voices.json` apart from key order and the order of the entries
-
 ### Requirement: Board action pairing comes from a table in the repo
 The Board action ↔ line pairing SHALL be read from `voice_pairings.json` in the repository, keyed by frame slug and clip name,
 with the huaxu line title as value. The script SHALL set `animation` to the clip name on the one entry whose `title` equals the
@@ -43,17 +39,9 @@ paired title. A title that matches no entry, or more than one, SHALL stop the sc
 title, and no file SHALL be written for that frame. Clips without a line ("Soon", "No Subtitle") SHALL have no entry in the table.
 Pairings SHALL NOT be typed into `data/` by hand.
 
-#### Scenario: Stigmata pairing
-- **WHEN** the table pairs Stigmata's `BoardAct0201` with "General Greeting 6"
-- **THEN** the entry for `v_biankasuper_9_6.mp3` has `animation` `BoardAct0201`
-
 #### Scenario: Unknown title
 - **WHEN** the table pairs a clip with a title that no line has
 - **THEN** the script fails naming the frame, the clip and the title, and that frame's `voices.json` is not written
-
-#### Scenario: No line yet
-- **WHEN** Veritas' `BoardAct0202` and `BoardAct0203` have no entry in the table
-- **THEN** no entry of Veritas' `voices.json` carries those clip names
 
 ### Requirement: Generated voice data is checked against data/
 A Node test SHALL check, for each frame that has a `voices.json`, that every entry's audio file exists in `voices_ja/`, that every

@@ -25,14 +25,6 @@ listed items of one frame share a name, each SHALL show its folder in brackets, 
 too. The field SHALL show a source item as `<Frame> · <name>`. Items whose clip has a paired voice line SHALL show a speaker glyph
 after the name, with the text "with voice" for screen readers.
 
-#### Scenario: Menu list on Crepuscule
-- **WHEN** the Menu context is shown for Crepuscule's Generic - Final
-- **THEN** the list reads `Idle`: `StandAct0101`, `UiStand1`; `Board actions`: `BoardAct0201` … `BoardAct1007`; then `Stigmata · Idle`, `Stigmata · Board actions` (with `BoardAct10021` and `BoardAct10022`), `Veritas · Idle`, `Veritas · Board actions`, `Zero · Idle`, `Zero · Board actions`
-
-#### Scenario: Fight list on Crepuscule
-- **WHEN** the Fight context is shown for Crepuscule's Generic - Final
-- **THEN** Crepuscule's own groups read `Idle`: `Stand1`, `Stand2`, `Standchange`; `Movement`: `Run`, `Walk`; `Level skills`: the four kept clips; `Other`: `Born`, `Save`, `Win`, followed by `Stigmata · Idle`, `Stigmata · Movement` (`Run`, `Walk`), `Stigmata · Other`, `Veritas · Idle`, `Veritas · Movement` (`Run`), `Veritas · Other`, and Zero's groups likewise
-
 #### Scenario: Field label of a source clip
 - **WHEN** Veritas' `Win` is selected on Crepuscule
 - **THEN** the field reads `Veritas · Win`
@@ -91,10 +83,6 @@ When a manifest's root node (`rootNode`) is a node above the pelvis bone, its po
 stays at its origin (Crepuscule's `Root`). When the root node is the pelvis bone `Bip001` itself (Stigmata, Veritas and Zero), its
 position track SHALL be applied, since it carries the pelvis height. Other tracks of the root node and all other nodes SHALL be
 applied.
-
-#### Scenario: Attack with root motion
-- **WHEN** Crepuscule's `Attack93` (root at z = −9.5 m in the data) plays
-- **THEN** the root node keeps its bind position and the model stays inside the stage
 
 #### Scenario: Root is the pelvis
 - **WHEN** Stigmata's `Run` plays on Stigmata's model

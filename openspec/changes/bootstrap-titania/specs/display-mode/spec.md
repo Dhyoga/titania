@@ -102,3 +102,7 @@ than the stage. A press inside the popover SHALL NOT be a tap on the stage.
 #### Scenario: Narrow panel
 - **WHEN** the panel is 320 px wide
 - **THEN** the Display menu's five buttons and its icon fit on one line, and the popover fits without horizontal scrolling
+
+#### Scenario: Choose a whole frame
+- **WHEN** Pavo's section checkbox is pressed on Shukra
+- **THEN** Pavo's idle and ten Board actions are checked, saved for Shukra, and Pavo's actions join Display's pool

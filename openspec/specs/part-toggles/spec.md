@@ -13,17 +13,9 @@ has no such prefix (Zero's `Cheek`) SHALL be listed under its full name in a gro
 prefix (a dorm chibi's single mesh) SHALL NOT be listed. Groups SHALL be ordered by model id with `Other` last, and meshes within a
 group by label with numbers compared by value. The list SHALL come from the model's own node names and SHALL NOT be hard-coded.
 
-#### Scenario: Crepuscule Generic - Final
-- **WHEN** Crepuscule's Generic - Final is shown
-- **THEN** its meshes are grouped as `010011` (14 meshes) and `010031` (Down, Part, Upper)
-
 #### Scenario: Five-digit ids and no prefix
 - **WHEN** Zero's Generic is shown
 - **THEN** `Eye`, `Face`, `Cloth01`, `Cloth02`, `Fur`, `Hair01` and `Hair02` are listed under `01001`, and `Cheek` under `Other`
-
-#### Scenario: Chibi
-- **WHEN** a dorm chibi is shown
-- **THEN** at most one mesh is listed (none on Crepuscule's, Stigmata's and Zero's; Veritas' lists its `Sleeve`) and the parts button is disabled, since it needs at least two
 
 ### Requirement: Parts popover
 The stage menu's puzzle button SHALL open a popover titled Parts with two sections:
@@ -45,10 +37,6 @@ at 320 px).
 #### Scenario: Open the popover
 - **WHEN** the puzzle button is pressed on Crepuscule's Generic - Final while `UiStand1` plays
 - **THEN** "Hidden by this animation" lists `BodyEX02`, `AlphaEX`, `AlphaEX01` and `FaceEX` switched off, "All meshes" lists the groups `010011` and `010031` with every switch on but `Band` and `BodyEX01` (the Light form), and Reset is disabled
-
-#### Scenario: Chibi
-- **WHEN** a dorm chibi is shown
-- **THEN** the puzzle button is disabled
 
 #### Scenario: Save
 - **WHEN** `Hat` is switched off on Sunlit Tides and "Save" is pressed
@@ -75,14 +63,6 @@ default framing of the camera.
 - **WHEN** `Hair01` is switched off on Crepuscule's Generic - Final
 - **THEN** that mesh is invisible and every other mesh is as before
 
-#### Scenario: Show a mesh the animation hides
-- **WHEN** `BodyEX02` is switched on in "Hidden by this animation" while `UiStand1` plays
-- **THEN** `BodyEX02` becomes visible and stays visible when `BoardAct0201` is selected
-
-#### Scenario: Group off survives a mesh swap
-- **WHEN** the group `010011` is switched off and `BoardAct0201` plays (the data then shows `BodyEX` meshes)
-- **THEN** no mesh of model id `010011`, base or `EX`, is visible
-
 #### Scenario: Framing is unchanged
 - **WHEN** `Hair01` is switched off and the camera is reset
 - **THEN** the camera returns to the same default framing as without choices
@@ -92,10 +72,6 @@ The user's unsaved choices SHALL be kept by node name across clips, contexts, sk
 choice, and a model without one SHALL be unaffected, with the choice kept for the next model that has it. What is saved for a skin SHALL apply whenever that skin is shown, under the unsaved choices. "Reset" SHALL drop every
 unsaved choice, including names the shown model does not have, which returns every mesh to what is saved for the skin, else to the
 skin's default form and the animation data. The panel SHALL open without unsaved choices.
-
-#### Scenario: Across skins
-- **WHEN** `Hair01` (`R5BiankaMd010011Hair01`) is switched off on Crepuscule's Generic and Generic - Final is selected
-- **THEN** the hair mesh of the same name on Generic - Final is invisible and its switch is off
 
 #### Scenario: Model without the mesh
 - **WHEN** a mesh is switched off on Thorns of Crimson and Generic (which has no mesh of that name) is selected, then Thorns of Crimson again

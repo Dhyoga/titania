@@ -44,10 +44,6 @@ manifest that lists it, followed by the `file` value without that `anim/` prefix
 - **WHEN** the manifest path is `anim/manifest.json` and the clip file is `anim/BaseLayer/Born.json`
 - **THEN** the asset path is `anim/BaseLayer/Born.json`
 
-#### Scenario: Other skin
-- **WHEN** the manifest path is `anim-skins/r5biankamd019241/manifest.json` and the clip file is `anim/BaseLayer/BoardAct0204.json`
-- **THEN** the asset path is `anim-skins/r5biankamd019241/BaseLayer/BoardAct0204.json`
-
 #### Scenario: Unexpected prefix
 - **WHEN** a clip file does not start with `anim/`
 - **THEN** resolving its path throws an error naming the file

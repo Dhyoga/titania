@@ -41,13 +41,10 @@ longer than the clip, the idle tail SHALL be the shown model's own menu idle cli
 ## ADDED Requirements
 
 ### Requirement: A frame with no clip set of its own plays only lent clips
-A frame whose construct configuration names no clip set SHALL be shown with all of its animations lent by the other frames. Its animation list SHALL
-hold the sources' groups only, in frame-list order, each group labelled with the source's name. What plays when such a frame is opened or switched to,
-and when a remembered clip is missing, SHALL be the first source's default clip of the context (`Shukra · UiStand1` in Menu, `Shukra · Stand1` in
-Fight). A lent clip's root node SHALL be the shown model's `Bip001`. No fill pose SHALL be used, so the bones the sources do not drive hold their bind
-pose. Nothing SHALL be hidden on the model except by the user. The player, the scrubber, the loop toggle and the Fight/Menu toggle SHALL be enabled as
-for any frame with clips (the "No animations" state applies only to a frame with neither a clip set nor sources). A selection SHALL be remembered by
-source frame and name across skin and frame switches, as for any lent clip.
+A frame whose construct configuration names no clip set SHALL be shown with all of its animations lent by the other frames: its list holds the sources'
+groups only, each labelled with the source's name, and it starts on the first source's default clip of the context. Lent clips SHALL use the shown model's
+`Bip001` as root, no fill pose and nothing hidden except by the user. Its player controls SHALL be enabled; "No animations" applies only with neither a clip
+set nor sources.
 
 #### Scenario: Open Erza
 - **WHEN** Erza is chosen in the frame picker while Shukra plays `BoardAct0201` in Menu
@@ -68,6 +65,10 @@ source frame and name across skin and frame switches, as for any lent clip.
 #### Scenario: Helper bones hold the bind pose
 - **WHEN** any lent clip plays on Erza
 - **THEN** her skirt, hair and ribbon bones stay in their bind pose and no error is logged
+
+#### Scenario: Controls and remembered selection
+- **WHEN** Erza is shown
+- **THEN** the player, the scrubber, the loop toggle and the Fight/Menu toggle are enabled, and a selection is remembered by source frame and name across skin and frame switches, as for any lent clip
 
 #### Scenario: Stays in bounds
 - **WHEN** Shukra's `Run` plays on Erza

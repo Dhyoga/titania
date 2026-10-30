@@ -47,6 +47,10 @@ names the offending field path.
 - **WHEN** a controller state refers to clip index 500 in a manifest with 70 clips
 - **THEN** parsing throws an error that names the controller and the state
 
+#### Scenario: Manifest without hidden nodes
+- **WHEN** Shukra's `anim/manifest.json` is parsed
+- **THEN** parsing succeeds with 70 clips, empty `hiddenNodes` for both contexts and an empty `stateHides`
+
 ### Requirement: Clip paths resolve against the manifest's folder
 A clip's `file` value in a manifest SHALL start with `anim/`. Its asset path SHALL be the folder of the
 manifest that lists it, followed by the `file` value without that `anim/` prefix.

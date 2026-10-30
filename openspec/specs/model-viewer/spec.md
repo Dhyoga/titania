@@ -211,10 +211,6 @@ or the model. A camera the user has moved SHALL keep its position when the canva
 - **WHEN** the default skin of each of the four frames is shown at the default framing at 320, 387 and 600 px wide
 - **THEN** each body fills at least 55 % of the canvas height and its torso is inside the width
 
-#### Scenario: Chibi
-- **WHEN** a chibi is shown at the default framing at 387 px wide
-- **THEN** its whole silhouette is inside the width
-
 #### Scenario: A bar over the bottom
 - **WHEN** a control bar over the bottom of the stage is hidden or shown
 - **THEN** the camera and the model do not move; the feet are visible only when the bar is hidden

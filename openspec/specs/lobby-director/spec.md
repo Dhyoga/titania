@@ -52,22 +52,6 @@ choosable as a lender. Actions SHALL be taken from one shuffled bag over the who
 the first action of a new bag SHALL NOT be the last one of the previous bag. When the pool is empty (the Display frame's data could not be
 read), Display SHALL stay in idle and a tap SHALL start nothing.
 
-#### Scenario: Crepuscule's default pool
-- **WHEN** Display shows any Crepuscule skin and no choice is saved for Crepuscule
-- **THEN** the pool holds thirty actions: Crepuscule's ten Board actions, Stigmata's twelve (its ten and Solitary Dream's two) and Veritas' eight (all but `0202` and `0203`)
-
-#### Scenario: Veritas' own pool
-- **WHEN** Display shows a Veritas skin and no choice is saved for Veritas
-- **THEN** the pool holds Veritas' `BoardAct0201`, `1001`, `1002`, `1003`, `1004`, `1005`, `1006` and `1007` and nothing borrowed
-
-#### Scenario: Solitary Dream's actions are Stigmata's own
-- **WHEN** Display shows Stigmata Generic - Final
-- **THEN** the pool holds `BoardAct10021` and `BoardAct10022` among its own actions, whatever is chosen
-
-#### Scenario: Zero chosen
-- **WHEN** the user has chosen Zero's `BoardAct1004` for Crepuscule
-- **THEN** that action is in the pool and plays with Zero's line and caption
-
 #### Scenario: No line, no pool
 - **WHEN** Display shows Night Sonata
 - **THEN** `BoardAct0204` and `BoardAct0205` (no voice line) are never played
@@ -167,10 +151,6 @@ over 0.25 s, the same one just goes on looping. The meshes shown follow the show
 - **WHEN** 400 idles are chosen on Crepuscule with the default choice
 - **THEN** between 20 % and 30 % of them are Stigmata's
 
-#### Scenario: Several borrowed idles
-- **WHEN** the user has chosen Stigmata's, Veritas' and Zero's `UiStand1` for Crepuscule and 1200 idles are chosen
-- **THEN** Crepuscule's own is 70 % to 80 % of them and each borrowed one 6 % to 11 %
-
 #### Scenario: No StandAct0101
 - **WHEN** 400 idles are chosen on any frame with any choice
 - **THEN** none of them is `StandAct0101`, own or borrowed
@@ -251,10 +231,6 @@ A clip borrowed for Display SHALL be retargeted onto the shown model, and play w
 its voice line and caption come from the frame it was borrowed from, the meshes shown follow the shown skin's rule for a clip of that name,
 and hair and cloth hold the mean pose of the shown model's idle. It SHALL be prepared in advance like an own action (its lender's rig read
 and its clip retargeted and cached), and its crossfades and end follow `lobby-director`'s other requirements.
-
-#### Scenario: Stigmata's action on Crepuscule
-- **WHEN** Display shows Crepuscule and Stigmata's `BoardAct0201` is chosen
-- **THEN** it plays with Stigmata's line (`v_biankasuper_9_6`) and its caption, on Crepuscule's body
 
 #### Scenario: Prepared like an own action
 - **WHEN** a borrowed action is next in the bag and Display has idled for 3 s

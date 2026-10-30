@@ -56,10 +56,6 @@ outlines, lighting, the parts menu, screenshots (named after its frame and skin)
 stage menu, the player and Focus, as Crepuscule is. Nothing SHALL be hidden on these models unless the user hides it (their manifests list no hidden
 nodes).
 
-#### Scenario: Toon shading on Zero
-- **WHEN** Zero's Generic - Final is shown
-- **THEN** it is drawn with cel bands and outlines, and turning "Toon shading" off shows its original materials
-
 #### Scenario: Screenshot name
 - **WHEN** a screenshot is taken of Veritas' `r3biankamd010031` during `Run` at 0.40 s
 - **THEN** the file is named `veritas_r3biankamd010031_Run_0.40s.png`

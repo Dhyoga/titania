@@ -20,6 +20,10 @@ chosen in the frame picker SHALL open on its default skin; the panel and Playgro
 - **WHEN** Erza is chosen in the frame picker
 - **THEN** the strip lists one tile, `Erza Scarlet`, marked default, and it is shown
 
+#### Scenario: Display model in Playground
+- **WHEN** the Display model is Pavo's Generic and the panel is switched to Playground
+- **THEN** the header reads Pavo and the strip marks Generic as the shown skin
+
 ### Requirement: Thumbnails with a placeholder
 A tile SHALL show the skin's icon from `icons/<id>.webp` when that file is available, and otherwise a neutral placeholder with
 the skin's initials, without an error. Icons SHALL be loaded only from the extension package.

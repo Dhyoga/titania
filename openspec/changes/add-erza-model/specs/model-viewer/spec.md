@@ -1,10 +1,9 @@
 ## ADDED Requirements
 
 ### Requirement: Erza is framed from her body
-The default framing of Erza SHALL be computed from her body's visible meshes, as for every model, so that her height fits the canvas with the usual
-margin, limited by her width where the panel is narrow. Her bounds SHALL NOT include a prop far from her body. Her arms are out in the bind pose
-(a T-pose), so the width limit SHALL be checked against her silhouette in the clips that play on her; the figures measured for her (crown and feet
-positions at 320, 387 and 600 px) are recorded in `AGENTS.md`, not written into this requirement.
+The default framing of Erza SHALL be computed from her body's visible meshes, as for every model: her height fits the canvas with the usual margin, limited by her
+width where the panel is narrow, and no prop far from her body is included. Her bind pose is a T-pose, so the width limit SHALL be checked against the clips that play
+on her; the figures measured for her are recorded in `AGENTS.md`, not here.
 
 #### Scenario: Tall panel
 - **WHEN** Erza is shown at 387 × 1045 px with no camera saved

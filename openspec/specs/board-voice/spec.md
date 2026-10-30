@@ -11,10 +11,6 @@ The panel SHALL read the `voices.json` of every frame whose clips the list offer
 assets. Pairings SHALL come from data only; no clip or file name SHALL be hard-coded. If a frame's `voices.json` cannot be read, no clip
 of that frame SHALL have a pairing and the rest of the panel SHALL work as before.
 
-#### Scenario: Crepuscule pairings
-- **WHEN** Crepuscule's Menu list is built
-- **THEN** its own ten Board actions have a pairing, e.g. `BoardAct0201` ↔ `crepuscule/voices_ja/v_biankasups_009_12.mp3` and `BoardAct1006` ↔ `crepuscule/voices_ja/v_biankasups_019.mp3`
-
 #### Scenario: Source frame pairing
 - **WHEN** Crepuscule's Menu list is built and Stigmata's `voices.json` pairs `BoardAct0201` with `v_biankasuper_9_6.mp3`
 - **THEN** `Stigmata · BoardAct0201` is paired with `stigmata/voices_ja/v_biankasuper_9_6.mp3`, and Crepuscule's own `BoardAct0201` keeps its own line

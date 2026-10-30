@@ -36,14 +36,6 @@ does not fit. The strip SHALL be a radio group: `←`/`→` SHALL move to the pr
 first or last, and the selected tile SHALL be scrolled into view. It SHALL be hidden while Focus is on (see `viewer-toolbar`), with
 the selected tile in view again when Focus is turned off, and SHALL NOT cause horizontal page scrolling at 320 px.
 
-#### Scenario: Pick with the mouse
-- **WHEN** the Night Sonata tile is clicked
-- **THEN** it becomes the highlighted tile and Night Sonata loads
-
-#### Scenario: Keyboard
-- **WHEN** the strip has focus on Generic and `→` is pressed twice
-- **THEN** Generic - Final is selected and loads
-
 #### Scenario: Narrow panel
 - **WHEN** the side panel is 320 px wide
 - **THEN** the strip scrolls inside itself, the progress bar shows its position, and the page does not scroll horizontally
@@ -72,18 +64,10 @@ is the shown frame's default skin.
 - **WHEN** Generic - Final of any frame is shown
 - **THEN** the title reads `Generic - Final` with a `DEFAULT` badge
 
-#### Scenario: Coating
-- **WHEN** Sunlit Tides is shown
-- **THEN** the title reads `Sunlit Tides` without a badge
-
 ### Requirement: Switching loads the skin's model and clip set
 Selecting a skin SHALL load its model and its clip set into the same viewer, apply that skin's own hidden-node lists, and release
 the previous model, its clips, its cached clips and any voice line. Switching between skins repeatedly SHALL NOT increase the
 renderer's geometry or texture counts for the same skin.
-
-#### Scenario: Coating with its own hidden nodes
-- **WHEN** Thorns of Crimson is selected in the Menu context
-- **THEN** its model is shown with the nodes 5, 11 and 362 of that model hidden (its menu list), and its `UiStand1` plays
 
 #### Scenario: No leak
 - **WHEN** all seven skins are selected one after another twice
@@ -96,21 +80,9 @@ line. A camera the user has moved SHALL keep its position; otherwise the new mod
 background, grid, auto-rotate, wireframe, toon shading, voice volume and mute, subtitles on or off and the user's loop choice SHALL stay
 as set, and the user's mesh choices SHALL stay, matched by node name.
 
-#### Scenario: Board action across skins
-- **WHEN** `BoardAct0201` plays on Generic and Sunlit Tides is selected
-- **THEN** `BoardAct0201` of Sunlit Tides plays from 0 with its voice line
-
-#### Scenario: Clip missing in the new skin
-- **WHEN** `BoardAct0204` plays on Night Sonata and Generic is selected
-- **THEN** Generic plays `UiStand1`
-
 #### Scenario: Fight context kept
 - **WHEN** the Fight context is shown on Generic and Generic - Final is selected
 - **THEN** the Fight list of Generic - Final is shown and the same Fight clip plays
-
-#### Scenario: Mesh choice kept
-- **WHEN** `Hair01` is switched off on Generic and Generic - Final is selected
-- **THEN** Generic - Final's `Hair01` (the same node name) is invisible
 
 ### Requirement: Loading and errors while switching
 While a skin loads the stage SHALL show the loading spinner with progress and the tile of that skin SHALL show that it is loading.

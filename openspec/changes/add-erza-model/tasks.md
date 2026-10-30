@@ -41,4 +41,4 @@
 ## 6. Project documents
 
 - [x] 6.1 Update `AGENTS.md` (the Erza section with the source facts and spike findings, the conversion conventions, the sources-only frame, her shading, the sword, the feet decision, known limits; the layout and the list of changes), `DESIGN.md` (Frames: her list is lent clips only, no Display; Shading: her path) and `README.md` (Erza, the conversion command)
-- [ ] 6.2 Commit; `openspec validate add-erza-model --strict` passes
+- [x] 6.2 Commit; `openspec validate add-erza-model --strict` passes

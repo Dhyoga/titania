@@ -15,6 +15,10 @@ in the frame picker SHALL open on its default skin; the panel and Playground SHA
 - **WHEN** Pavo is chosen in the frame picker
 - **THEN** the strip lists Pavo's Generic only, and it is shown
 
+#### Scenario: Display model in Playground
+- **WHEN** the Display model is Pavo's Generic and the panel is switched to Playground
+- **THEN** the header reads Pavo and the strip marks Generic as the shown skin
+
 ### Requirement: Skin strip
 In Playground, below the stage card, the panel SHALL show a horizontally scrolling strip of square thumbnails, one per skin, grouped as
 Generic, Coatings and Chibi with each group's label written vertically before its tiles; a group without skins SHALL NOT be shown. The
