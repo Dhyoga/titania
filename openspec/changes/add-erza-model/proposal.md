@@ -28,6 +28,8 @@ Scale, facing, bind pose and skin weights of these ripped files are unknown, so 
   current pairings this is rare (only Shukra's `BoardAct1004`, by 0.1 s), but Erza has no `UiStand1` of her own, so design decides which
   idle takes over for her (the lending frame of the action, or a fixed one) and that is built here, since Playground plays lent voiced
   Board actions on her and a later pairing can give a longer line.
+- **Her sword is left out**: in the file it is skinned to its own bones (`Bone_wq_*`), floating 1 to 2.5 m to her side and 3.9 m long, so the
+  converted model is her body only (the script keeps the sword behind a `--weapon` flag). Giving it a place in her hand is a later change.
 - **Known limits, recorded and accepted here**: Erza's bones without a source track (skirt `Bone_qz*` / `Bone_qunzi_*`, hair
   `Bone_toufa*`, ribbons and cape `Bone_tf_*`) hold their bind pose, since there is no idle of her own to fill from; her face is driven
   by bones (`Bone_ypS/ypX` eyelids, `Bone_zb_*` mouth, `Bone_yz_*` eyes, `Bone_mm*` brows) while Qu's clips animate morph targets, so her

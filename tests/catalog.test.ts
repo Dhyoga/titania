@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { buildCatalog, hiddenNodesFor, naturalCompare, ownItemId, resolveFightIdle, withSources, type AnimationSource } from '../lib/anim/catalog.ts'
-import { FRAMES } from '../lib/constructs/index.ts'
+import { lendingFrames } from '../lib/constructs/index.ts'
 import { parseManifest, type AnimManifest } from '../lib/anim/manifest.ts'
 
 /** A manifest with the given clips; `menu` and `fight` list clip names per controller. */
@@ -168,7 +168,9 @@ test('hiddenNodesFor: stateHides of the clip in Menu, else the context list', ()
 
 // Real data: Shukra's and Pavo's Generic clip sets. Skipped when data/ is absent.
 const manifestUrl = (frame: string) => new URL(`../data/${frame}/anim/manifest.json`, import.meta.url)
-const skip = !FRAMES.every((f) => existsSync(manifestUrl(f.id))) && 'data/ is not present'
+// Qu's frames: the ones with a clip set. Erza has none (add-erza-model): her lists are built from these.
+const QU = lendingFrames()
+const skip = !QU.every((f) => existsSync(manifestUrl(f.id))) && 'data/ is not present'
 const manifestOf = (frame: string) => parseManifest(JSON.parse(readFileSync(manifestUrl(frame), 'utf8')))
 
 const BOARD = ['BoardAct0201', 'BoardAct0202', 'BoardAct0203', 'BoardAct1001', 'BoardAct1002', 'BoardAct1003', 'BoardAct1004', 'BoardAct1005', 'BoardAct1006', 'BoardAct1007']
@@ -262,18 +264,19 @@ test('node visibility: Qu\'s models hide nothing, in any context or clip', { ski
 // ---------------------------------------------------------------- lending frames (add-cross-frame-animation)
 
 function sourcesFor(shown: string): AnimationSource[] {
-  return FRAMES.filter((f) => f.id !== shown).map((f) => sourceOf(f.id))
+  return QU.filter((f) => f.id !== shown).map((f) => sourceOf(f.id))
 }
 
 function sourceOf(id: string): AnimationSource {
-  return FRAMES.filter((f) => f.id === id).map((f) => {
+  return QU.filter((f) => f.id === id).map((f) => {
     const read = (path: string) => parseManifest(JSON.parse(readFileSync(new URL(`../data/${f.id}/${path}`, import.meta.url), 'utf8')))
+    const src = f.animationSource!
     return {
       frame: f.id,
       label: f.displayName,
-      manifestPath: f.animationSource.manifest,
-      manifest: read(f.animationSource.manifest),
-      extras: f.animationSource.extras.map((e) => ({ manifestPath: e.manifest, manifest: read(e.manifest), clips: e.clips, label: e.label, replace: e.replace })),
+      manifestPath: src.manifest,
+      manifest: read(src.manifest),
+      extras: src.extras.map((e) => ({ manifestPath: e.manifest, manifest: read(e.manifest), clips: e.clips, label: e.label, replace: e.replace })),
     }
   })[0]!
 }
@@ -368,4 +371,51 @@ test('replace extras: on another frame a lender\'s clip comes from the extra set
   const myBoard = mine.groups.find((g) => g.label === 'Board actions')!.items
   assert.equal(myBoard.length, 3)
   assert.equal(myBoard.find((i) => i.name === 'BoardAct1005')!.source, null, 'the lender\'s own list keeps its own clip')
+})
+
+// ---------------------------------------------------------------- a frame with no clip set of its own (add-erza-model)
+
+test('Erza: the Menu list is the sources\' groups only, Shukra first, and the default is Shukra\'s UiStand1', { skip }, () => {
+  const catalog = withSources(null, QU.map((f) => sourceOf(f.id)), 'menu')!
+  assert.deepEqual(catalog.groups.map((g) => g.label), ['Shukra · Idle', 'Shukra · Board actions', 'Pavo · Idle', 'Pavo · Board actions'])
+  const group = (label: string) => catalog.groups.find((g) => g.label === label)!.items
+  assert.deepEqual(group('Shukra · Idle').map((i) => i.name), ['StandAct0101', 'UiStand1'])
+  assert.deepEqual(group('Shukra · Board actions').map((i) => i.name), BOARD)
+  assert.deepEqual(group('Pavo · Idle').map((i) => i.name), ['StandAct0101', 'UiStand1'])
+  assert.deepEqual(group('Pavo · Board actions').map((i) => i.name), BOARD)
+  const all = catalog.groups.flatMap((g) => g.items)
+  assert.ok(all.every((i) => i.source !== null), 'no clip of her own')
+  assert.equal(new Set(all.map((i) => i.id)).size, all.length, 'ids are unique although both frames have the same names')
+  assert.equal(catalog.defaultClip, null)
+  const start = all.find((i) => i.id === catalog.defaultItem)!
+  assert.equal(start.fieldLabel, 'Shukra · UiStand1')
+  assert.equal(start.loop, true)
+})
+
+test('Erza: the Fight list is Shukra\'s groups then Pavo\'s, and the default is Shukra\'s Stand1', { skip }, () => {
+  const catalog = withSources(null, QU.map((f) => sourceOf(f.id)), 'fight')!
+  assert.deepEqual(catalog.groups.map((g) => [g.label, g.items.map((i) => i.name)]), [
+    ['Shukra · Idle', ['Stand1', 'Stand2', 'Standchange']],
+    ['Shukra · Movement', ['Run', 'Walk']],
+    ['Shukra · Other', ['Born', 'Save', 'Win']],
+    ['Pavo · Idle', ['Stand1', 'Stand2', 'Standchange']],
+    ['Pavo · Movement', ['Run', 'Walk']],
+    ['Pavo · Level skills', ['LevelAttack14']],
+    ['Pavo · Other', ['Born', 'Executioner01', 'Executioner02', 'Executioner03', 'Executioner04', 'Executioner05', 'Save', 'Win']],
+  ])
+  assert.equal(catalog.groups.flatMap((g) => g.items).find((i) => i.id === catalog.defaultItem)!.fieldLabel, 'Shukra · Stand1')
+})
+
+test('a frame with a clip set keeps defaultClip, and its defaultItem names that clip', { skip }, () => {
+  for (const context of ['menu', 'fight'] as const) {
+    const own = buildCatalog(manifestOf('shukra'), context)
+    assert.equal(own.defaultItem, ownItemId(own.defaultClip))
+    const withPavo = withSources(own, sourcesFor('shukra'), context)
+    assert.equal(withPavo.defaultItem, own.defaultItem, 'lent clips do not change what the frame starts on')
+    assert.equal(withPavo.defaultClip, own.defaultClip)
+  }
+})
+
+test('no clip set and no source: no list', () => {
+  assert.equal(withSources(null, [], 'menu'), null)
 })

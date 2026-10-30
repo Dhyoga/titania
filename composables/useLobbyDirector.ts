@@ -6,6 +6,7 @@ import {
   type DirectorConfig,
   type DirectorEvent,
 } from '~/lib/lobby/director'
+import { lendingFrames } from '~/lib/constructs'
 import { defaultChoice, listCandidates, resolvePool, type LobbyPool, type PoolItem } from '~/lib/lobby/pool'
 import type { PlaybackState } from '~/lib/viewer/Playback'
 import type { Mode } from './mode'
@@ -188,8 +189,10 @@ export function useLobbyDirector(options: LobbyDirectorOptions) {
     const saved = preferences.prefs.value.lobby.pools[current.construct.id]
     const actionFrames = new Set(saved ? saved.filter((k) => k.includes(':BoardAct')).map((k) => k.split(':')[0]!) : (lobby?.actionFrom ?? []))
     const idleFrames = new Set(saved ? saved.filter((k) => !k.includes(':BoardAct')).map((k) => k.split(':')[0]!) : (lobby?.idleFrom ?? []))
+    // A frame with no clip set of its own (Erza) lends nothing by design, so a saved key naming one is not a failure worth a warning.
+    const lenders = new Set(lendingFrames().map((f) => f.id))
     for (const frame of new Set([...actionFrames, ...idleFrames])) {
-      if (frame === current.construct.id) continue
+      if (frame === current.construct.id || !lenders.has(frame)) continue
       const lends = items.filter((i) => i.source?.frame === frame)
       if (lends.length === 0) console.warn(`Lobby: ${frame} lends no clips; its clips are left out of Display`)
       else if (actionFrames.has(frame) && !lends.some((i) => voiced.has(i.id))) {

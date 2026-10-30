@@ -30,3 +30,13 @@ test('Shukra and Pavo borrow from each other by default: Board actions and idles
   assert.deepEqual(getConstruct('shukra').lobby, { actionFrom: ['pavo'], idleFrom: ['pavo'] })
   assert.deepEqual(getConstruct('pavo').lobby, { actionFrom: ['shukra'], idleFrom: ['shukra'] })
 })
+
+test('Erza has no lobby configuration and no frame borrows from her: she has no clips or lines to lend', () => {
+  assert.equal(getConstruct('erza').lobby, undefined)
+  assert.ok(ids.includes('erza'), 'she is a frame')
+  for (const frame of configured) {
+    for (const list of [frame.lobby!.actionFrom, frame.lobby!.idleFrom]) {
+      for (const name of list) assert.notEqual(getConstruct(name).animationSource, null, `${frame.id} borrows from ${name}, which has no clip set`)
+    }
+  }
+})

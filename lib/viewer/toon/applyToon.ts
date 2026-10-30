@@ -3,7 +3,9 @@
 // whichever set is shown. No Vue imports.
 import * as THREE from 'three'
 import type { GLTFParser } from 'three/addons/loaders/GLTFLoader.js'
-import { materialRefs, pairOutlines, parseToonMaterial, type ToonParams } from './params'
+import { materialRefs, pairOutlines, parseDiffuseShadowMaterial, parseToonMaterial, type DiffuseShadowParams, type ToonParams } from './params'
+import { createDefaultOutlineMaterial } from './DefaultOutline'
+import { createDiffuseShadowMaterial, DIFFUSE_SHADOW_RENDER_ORDER } from './DiffuseShadowMaterial'
 import { createOutlineMaterial, createOutlineMesh } from './OutlineMaterial'
 import { alphaClip, createToonMaterial, receivesSelfShadow, type SharedToonUniforms } from './ToonMaterial'
 
@@ -48,6 +50,8 @@ export interface ToonCounts {
 /** Parameters and textures of a model, loaded before the model is shown (the only asynchronous part). */
 export interface ToonSources {
   params: (ToonParams | null)[]
+  /** The materials of a model with no PGR parameters (Erza): a base-colour and a shadow-colour texture each. */
+  diffuseShadow: (DiffuseShadowParams | null)[]
   outlines: Map<number, number>
   textures: Map<number, THREE.Texture>
 }
@@ -57,6 +61,7 @@ export async function loadToonSources(parser: GLTFParser): Promise<ToonSources> 
   const gltfTextures = json.textures ?? []
   const materials = json.materials ?? []
   const params = materials.map((m) => parseToonMaterial(m, gltfTextures))
+  const diffuseShadow = materials.map((m) => parseDiffuseShadowMaterial(m))
   const outlines = pairOutlines(materialRefs(materials))
 
   // Only the slots of the materials that are on meshes.
@@ -71,6 +76,11 @@ export async function loadToonSources(parser: GLTFParser): Promise<ToonSources> 
       if (t) wanted.set(t.index, t.srgb)
     }
   }
+  // Both textures of a diffuse/shadow material are colour images.
+  for (const index of used) {
+    const d = diffuseShadow[index]
+    if (d) for (const texture of [d.base, d.shadow]) wanted.set(texture, true)
+  }
   const textures = new Map<number, THREE.Texture>()
   await Promise.all(
     [...wanted].map(async ([index, srgb]) => {
@@ -83,7 +93,7 @@ export async function loadToonSources(parser: GLTFParser): Promise<ToonSources> 
       textures.set(index, texture)
     }),
   )
-  return { params, outlines, textures }
+  return { params, diffuseShadow, outlines, textures }
 }
 
 export class ToonModel {
@@ -122,6 +132,11 @@ export class ToonModel {
       if (!(mesh instanceof THREE.Mesh) || Array.isArray(mesh.material)) return
       const materialIndex = json.meshes?.[node.mesh]?.primitives?.[0]?.material
       if (materialIndex === undefined) return
+      const diffuseShadow = sources.diffuseShadow[materialIndex]
+      if (diffuseShadow) {
+        this.addDiffuseShadow(mesh, diffuseShadow, sources, shared, toonCache, outlineCache)
+        return
+      }
       const params = sources.params[materialIndex]
       if (!toned(params)) return // keeps its glTF material
 
@@ -168,6 +183,42 @@ export class ToonModel {
       }
       this.entries.push({ mesh, original, toon, outline, caster: !blended, receiver: receivesSelfShadow(params), depth })
     })
+  }
+
+  /**
+   * A mesh of a model with no PGR parameters (Erza): the diffuse/shadow material and a default outline of the mesh's own geometry. Materials
+   * are shared by material index and outlines by base texture, like the PGR ones; none casts or receives the self-shadow.
+   */
+  private addDiffuseShadow(
+    mesh: THREE.Mesh,
+    params: DiffuseShadowParams,
+    sources: ToonSources,
+    shared: SharedToonUniforms,
+    toonCache: Map<string, THREE.ShaderMaterial>,
+    outlineCache: Map<string, THREE.ShaderMaterial>,
+  ): void {
+    const base = sources.textures.get(params.base)
+    const shadow = sources.textures.get(params.shadow)
+    if (!base || !shadow) return // a texture that did not load: the mesh keeps its glTF material
+    const original = mesh.material as THREE.Material
+    const key = `ds|${params.base}|${params.shadow}|${original.side}`
+    let toon = toonCache.get(key)
+    if (!toon) {
+      toon = createDiffuseShadowMaterial(base, shadow, shared, { name: params.name, side: original.side })
+      toonCache.set(key, toon)
+      this.materials.add(toon)
+    }
+    const outlineKey = `ds-outline|${params.base}`
+    let material = outlineCache.get(outlineKey)
+    if (!material) {
+      material = createDefaultOutlineMaterial(base, shared, params.name)
+      outlineCache.set(outlineKey, material)
+      this.materials.add(material)
+    }
+    const outline = createOutlineMesh(mesh, material, DIFFUSE_SHADOW_RENDER_ORDER + 1)
+    outline.visible = false
+    mesh.add(outline)
+    this.entries.push({ mesh, original, toon, outline, caster: false, receiver: false, depth: null })
   }
 
   /** Show the toon set (materials, outlines, self-shadow flags) or the glTF materials. */

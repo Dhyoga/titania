@@ -1,3 +1,4 @@
+import { erza } from './erza.ts'
 import { shukra } from './shukra.ts'
 import { pavo } from './pavo.ts'
 import type { SkinConfig } from './skins.ts'
@@ -29,18 +30,27 @@ export interface ConstructConfig {
    * What the frame lends to the other frames' models: the Generic clip set's manifest and named clips of other clip sets (labelled
    * with their skin). An extra adds clips the Generic set lacks, which the frame's other skins get too; with `replace` it lends its
    * clips in place of the same-named Generic ones and only to other frames. Each set is retargeted from the rig of its manifest's
-   * `target` model.
+   * `target` model. Null for a frame with no clip set of its own (Erza): it lends nothing, has no clips, and plays only what the other frames
+   * lend it.
    */
-  animationSource: { manifest: string; extras: { manifest: string; label: string; clips: string[]; replace?: boolean }[] }
+  animationSource: { manifest: string; extras: { manifest: string; label: string; clips: string[]; replace?: boolean }[] } | null
+  /** False for a frame that Display does not offer (Erza, which has no clips or voice lines of her own): not a Display model, not a lender. */
+  display?: false
   /** What Display borrows for this frame's model; none means it keeps to its own clips. */
   lobby?: LobbyConfig
 }
 
 /**
- * Qu's frames, in the order the panel's picker lists them (they are shown only until erza-only-companion). The one place that decides
+ * Erza and Qu's frames, in the order the panel's picker lists them (Qu's are shown only until erza-only-companion). The one place that decides
  * which constructs exist: the panel and the build (`wxt.config.ts`, which serves every one of them) both read it.
  */
-export const FRAMES: readonly ConstructConfig[] = [shukra, pavo]
+export const FRAMES: readonly ConstructConfig[] = [erza, shukra, pavo]
+
+/** The frames Display can show and borrow from: those that have a clip set of their own. */
+export const displayFrames = (frames: readonly ConstructConfig[] = FRAMES): ConstructConfig[] => frames.filter((f) => f.display !== false)
+
+/** The frames that lend clips to the shown model: those with a clip set (animation source). */
+export const lendingFrames = (frames: readonly ConstructConfig[] = FRAMES): ConstructConfig[] => frames.filter((f) => f.animationSource !== null)
 
 /** The frame the panel opens on. */
 export const DEFAULT_FRAME = shukra.id

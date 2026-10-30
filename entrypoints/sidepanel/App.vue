@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { DEFAULT_FRAME, FRAMES, getConstruct } from '~/lib/constructs'
-import { resolveDisplayModel, type ModelChoice } from '~/lib/constructs/display'
+import { isDisplayFrame, resolveDisplayModel, type ModelChoice } from '~/lib/constructs/display'
 import type { Mode } from '~/composables/mode'
 import { usePreferences } from '~/composables/usePreferences'
 import PanelHeader from '~/components/PanelHeader.vue'
@@ -9,6 +9,8 @@ import ModelTab from '~/components/ModelTab.vue'
 
 const { prefs, update, flush } = usePreferences()
 const frames = FRAMES.map((f) => ({ id: f.id, name: f.displayName }))
+// Display offers only the frames that have a clip set of their own (not Erza).
+const displayFrames = FRAMES.filter(isDisplayFrame).map((f) => ({ id: f.id, name: f.displayName }))
 
 // The panel always opens in Display, on the saved Display model (the default model until the user chooses another).
 const mode = ref<Mode>('display')
@@ -62,6 +64,7 @@ function switchMode(next: Mode): void {
       :mode="mode"
       :display-model="displayModel"
       :frames="frames"
+      :display-frames="displayFrames"
       @select-skin="selectPlaygroundSkin"
       @choose-display-frame="chooseDisplayFrame"
       @choose-display-skin="chooseDisplaySkin"

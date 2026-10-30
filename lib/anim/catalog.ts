@@ -4,7 +4,8 @@
 // Fight: the unique clips of `contexts.fight.base` and every `levels` controller (all layers), grouped by name, then cut down
 // to the clips worth showing (see `FIGHT_SHOWN`). There is no `Bind pose` item: the list is only clips.
 // Other frames lend their clips (`withSources`): their groups follow the shown frame's own, labelled with the frame's name. A frame's
-// extra clips (Stigmata's Solitary Dream Board actions) also join its own list on its skins that lack them.
+// extra clips (Stigmata's Solitary Dream Board actions) also join its own list on its skins that lack them. A frame with no clip set of its
+// own (Erza) has no own groups: its list is the sources' groups only, and it starts on the first source's default clip.
 import type { AnimManifest, Controller } from './manifest.ts'
 
 export type ContextId = 'menu' | 'fight'
@@ -41,9 +42,14 @@ export interface CatalogGroup {
 
 export interface Catalog {
   groups: CatalogGroup[]
-  /** Clip index (of the shown skin's manifest) played when the context is entered. */
-  defaultClip: number
+  /** Clip index (of the shown skin's manifest) played when the context is entered; null for a frame with no clip set of its own. */
+  defaultClip: number | null
+  /** Id of the item played when the context is entered: the shown skin's default clip, or for a frame with none the first source's own default. */
+  defaultItem: string
 }
+
+/** The catalog of one skin's own manifest: it always has a default clip. */
+export type OwnCatalog = Catalog & { defaultClip: number }
 
 /** Id of the shown frame's clip `clip` in a list. */
 export const ownItemId = (clip: number): string => `#${clip}`
@@ -185,19 +191,20 @@ export function resolveFightIdle(manifest: AnimManifest): number {
   return state.clip
 }
 
-export function buildCatalog(manifest: AnimManifest, context: ContextId): Catalog {
+export function buildCatalog(manifest: AnimManifest, context: ContextId): OwnCatalog {
   if (context === 'menu') {
     const menu = manifest.contexts.menu
     const clips = [...controllerClips(controller(manifest, menu.base, 'contexts.menu.base')), menu.idle.clip]
     const groupOf = (name: string) => (name.startsWith('BoardAct') ? 'Board actions' : 'Idle')
-    return { groups: buildGroups(manifest, clips, groupOf, ['Idle', 'Board actions']), defaultClip: menu.idle.clip }
+    return { groups: buildGroups(manifest, clips, groupOf, ['Idle', 'Board actions']), defaultClip: menu.idle.clip, defaultItem: ownItemId(menu.idle.clip) }
   }
   const fight = manifest.contexts.fight
   const ids = [fight.base, ...(fight.levels ?? [])]
   const clips = ids
     .flatMap((id, i) => controllerClips(controller(manifest, id, i === 0 ? 'contexts.fight.base' : `contexts.fight.levels[${i - 1}]`)))
     .filter((clip) => fightShown(manifest.clips[clip]!.name))
-  return { groups: buildGroups(manifest, preferBaseLayer(manifest, [...new Set(clips)]), fightGroup, FIGHT_ORDER), defaultClip: resolveFightIdle(manifest) }
+  const defaultClip = resolveFightIdle(manifest)
+  return { groups: buildGroups(manifest, preferBaseLayer(manifest, [...new Set(clips)]), fightGroup, FIGHT_ORDER), defaultClip, defaultItem: ownItemId(defaultClip) }
 }
 
 /**
@@ -281,14 +288,27 @@ function ownExtras(own: Catalog, source: AnimationSource, context: ContextId): C
       }
     }
   }
-  return { groups, defaultClip: own.defaultClip }
+  return { ...own, groups }
+}
+
+/** Id of a lending frame's own default clip for `context` (its menu idle, its fight idle) among the items `sourceGroups` lists. */
+export function sourceDefaultItem(source: AnimationSource, context: ContextId): string {
+  return `${source.frame}:${source.manifestPath}#${buildCatalog(source.manifest, context).defaultClip}`
 }
 
 /**
  * The shown frame's list (with its own extras when `ownSource` is given) followed by the groups of every lending frame, in the given
- * order.
+ * order. A frame with no clip set of its own (`own` null) gets the sources' groups only and starts on the first source's default clip; with
+ * no source either there is no list (null).
  */
-export function withSources(own: Catalog, sources: readonly AnimationSource[], context: ContextId, ownSource?: AnimationSource): Catalog {
+export function withSources(own: Catalog, sources: readonly AnimationSource[], context: ContextId, ownSource?: AnimationSource): Catalog
+export function withSources(own: null, sources: readonly AnimationSource[], context: ContextId): Catalog | null
+export function withSources(own: Catalog | null, sources: readonly AnimationSource[], context: ContextId, ownSource?: AnimationSource): Catalog | null {
+  if (own === null) {
+    const first = sources[0]
+    if (!first) return null
+    return { groups: sources.flatMap((s) => sourceGroups(s, context)), defaultClip: null, defaultItem: sourceDefaultItem(first, context) }
+  }
   const shown = ownSource ? ownExtras(own, ownSource, context) : own
-  return { groups: [...shown.groups, ...sources.flatMap((s) => sourceGroups(s, context))], defaultClip: own.defaultClip }
+  return { ...own, groups: [...shown.groups, ...sources.flatMap((s) => sourceGroups(s, context))] }
 }

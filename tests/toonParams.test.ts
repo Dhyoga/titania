@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { materialRefs, pairOutlines, parseToonMaterial, type MaterialRef } from '../lib/viewer/toon/params.ts'
+import { materialRefs, pairOutlines, parseDiffuseShadowMaterial, parseToonMaterial, type MaterialRef } from '../lib/viewer/toon/params.ts'
 
 test('defaults: a character material with no parameters', () => {
   const p = parseToonMaterial({ name: 'X', extras: { family: 'character' } })
@@ -304,4 +304,40 @@ test('real models: emission, colour ramps, zones and matcap on meshes', { skip }
     shukra: { emission: 3, flowing: 0, matcap: 2, skinRamp: 7, multiSkin: 2, shadowSets: 0, effect: 0 },
     pavo: { emission: 0, flowing: 0, matcap: 1, skinRamp: 2, multiSkin: 0, shadowSets: 0, effect: 0 },
   })
+})
+
+// ---- the diffuseShadow family (add-erza-model) ----
+
+const erzaMaterial = { name: 'Role_Erza', pbrMetallicRoughness: { baseColorTexture: { index: 0 } }, doubleSided: false, extras: { family: 'diffuseShadow', shadowTexture: 1 } }
+
+test('diffuseShadow: base colour from the glTF material, shadow colour from the extras', () => {
+  assert.deepEqual(parseDiffuseShadowMaterial(erzaMaterial), { name: 'Role_Erza', base: 0, shadow: 1, doubleSided: false })
+  assert.equal(parseDiffuseShadowMaterial({ ...erzaMaterial, doubleSided: true })?.doubleSided, true)
+})
+
+test('diffuseShadow: a material missing either texture, or of another family, is not one', () => {
+  assert.equal(parseDiffuseShadowMaterial({ ...erzaMaterial, extras: { family: 'diffuseShadow' } }), null)
+  assert.equal(parseDiffuseShadowMaterial({ ...erzaMaterial, extras: { family: 'diffuseShadow', shadowTexture: -1 } }), null)
+  assert.equal(parseDiffuseShadowMaterial({ ...erzaMaterial, extras: { family: 'diffuseShadow', shadowTexture: 1.5 } }), null)
+  assert.equal(parseDiffuseShadowMaterial({ ...erzaMaterial, pbrMetallicRoughness: {} }), null)
+  assert.equal(parseDiffuseShadowMaterial({ ...erzaMaterial, extras: { family: 'character', shadowTexture: 1 } }), null)
+  for (const junk of [null, undefined, 3, 'x', [], {}, { extras: 4 }]) assert.equal(parseDiffuseShadowMaterial(junk), null)
+})
+
+test('diffuseShadow: the PGR parser leaves such a material alone, and a PGR material parses as before', () => {
+  assert.equal(parseToonMaterial(erzaMaterial), null, 'not a PGR family')
+  assert.equal(parseDiffuseShadowMaterial({ name: 'X', extras: { family: 'character', shader: { floats: { _FirstShadow: 0.3 } } } }), null)
+  assert.equal(parseToonMaterial({ name: 'X', extras: { family: 'character', shader: { floats: { _FirstShadow: 0.3 } } } })?.shadow.first, 0.3)
+})
+
+test('diffuseShadow: Erza\'s converted materials are read', { skip: !existsSync(new URL('../data/erza/models/erza-scarlet.glb', import.meta.url)) && 'data/erza/ has no converted model' }, () => {
+  const b = readFileSync(new URL('../data/erza/models/erza-scarlet.glb', import.meta.url))
+  const json = JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12)).toString('utf8')) as { materials: unknown[]; textures: unknown[] }
+  assert.ok(json.materials.length >= 1)
+  for (const m of json.materials) {
+    const p = parseDiffuseShadowMaterial(m)
+    assert.ok(p, 'every material of hers is diffuseShadow')
+    assert.ok(p.base < json.textures.length && p.shadow < json.textures.length && p.base !== p.shadow)
+    assert.equal(parseToonMaterial(m), null)
+  }
 })

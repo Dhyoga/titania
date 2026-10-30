@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { DEFAULT_FRAME, FRAMES, getConstruct } from '../lib/constructs/index.ts'
+import { DEFAULT_FRAME, FRAMES, getConstruct, lendingFrames } from '../lib/constructs/index.ts'
+import { erza } from '../lib/constructs/erza.ts'
 import { pavo } from '../lib/constructs/pavo.ts'
 import { shukra } from '../lib/constructs/shukra.ts'
 import { findSkin, initials, skinAssets, skinGroups, skinWidthShare, type SkinConfig } from '../lib/constructs/skins.ts'
@@ -60,16 +61,30 @@ test('initials for placeholder tiles', () => {
   assert.equal(initials('the of'), '?')
 })
 
-test('the frame list: Shukra, Pavo; the panel opens on Shukra', () => {
-  assert.deepEqual(FRAMES.map((f) => f.id), ['shukra', 'pavo'])
-  assert.deepEqual(FRAMES.map((f) => f.displayName), ['Shukra', 'Pavo'])
+test('the frame list: Erza first, then Shukra and Pavo; the panel opens on Shukra', () => {
+  assert.deepEqual(FRAMES.map((f) => f.id), ['erza', 'shukra', 'pavo'])
+  assert.deepEqual(FRAMES.map((f) => f.displayName), ['Erza', 'Shukra', 'Pavo'])
+  assert.deepEqual(lendingFrames().map((f) => f.id), ['shukra', 'pavo'], 'Erza has no clip set, so she lends nothing')
   assert.equal(DEFAULT_FRAME, 'shukra')
   assert.equal(getConstruct('pavo'), pavo)
   assert.throws(() => getConstruct('crepuscule'), /Unknown construct: crepuscule/)
 })
 
-test('every frame: Generic is the default, ids are unique, all serve the same paths without anim-skins', () => {
-  for (const frame of FRAMES) {
+test('Erza: one skin, Erza Scarlet, which is also the default; no clip set, no voice lines, models and icons served, not in Display', () => {
+  assert.deepEqual(erza.skins, [{ id: 'erza-scarlet', name: 'Erza Scarlet', group: 'generic', manifest: null }])
+  assert.equal(erza.defaultSkin, 'erza-scarlet')
+  assert.equal(erza.animationSource, null)
+  assert.equal(erza.display, false)
+  assert.deepEqual(erza.servedPaths, ['models', 'icons'], 'no clips, no voices, and not her source/ folder')
+  assert.equal(getConstruct('erza'), erza)
+  assert.deepEqual(skinGroups(erza.skins).map((g) => [g.label, g.skins.length]), [['GENERIC', 1]])
+  assert.deepEqual(skinAssets(erza.skins[0]!), { modelPath: 'models/erza-scarlet.glb', manifestPath: null, iconPath: 'icons/erza-scarlet.webp' })
+  assert.equal(initials('Erza Scarlet'), 'ES', 'her tile is a placeholder with the initials ES')
+  assert.equal(skinWidthShare(erza.skins[0]!), PERSON_WIDTH_SHARE)
+})
+
+test('every Qu frame: Generic is the default, ids are unique, all serve the same paths without anim-skins', () => {
+  for (const frame of lendingFrames()) {
     assert.equal(frame.skins.find((s) => s.id === frame.defaultSkin)?.name, 'Generic', frame.id)
     assert.equal(new Set(frame.skins.map((s) => s.id)).size, frame.skins.length, frame.id)
     assert.deepEqual(frame.servedPaths, ['models', 'anim', 'voices_ja', 'voices.json', 'icons'], frame.id)
@@ -82,12 +97,12 @@ test('every frame: Generic is the default, ids are unique, all serve the same pa
 const skip = !FRAMES.every((f) => existsSync(new URL(`../data/${f.id}/models/`, import.meta.url))) && 'data/ is not present'
 
 for (const frame of FRAMES) {
-  test(`${frame.id}: every skin model and manifest exists, each manifest targets its skin, every icon exists`, { skip }, () => {
+  test(`${frame.id}: every skin model and manifest exists, each manifest targets its skin, every icon exists (Erza has none)`, { skip }, () => {
     const dataDir = new URL(`../data/${frame.id}/`, import.meta.url)
     for (const skin of frame.skins) {
       const { modelPath, manifestPath, iconPath } = skinAssets(skin)
       assert.ok(existsSync(new URL(modelPath, dataDir)), modelPath)
-      assert.ok(existsSync(new URL(iconPath, dataDir)), `${iconPath} (run download_construct.py ${frame.id})`)
+      if (frame.animationSource !== null) assert.ok(existsSync(new URL(iconPath, dataDir)), `${iconPath} (run download_construct.py ${frame.id})`)
       if (manifestPath === null) continue
       const manifest = JSON.parse(readFileSync(new URL(manifestPath, dataDir), 'utf8')) as { target: string }
       assert.equal(manifest.target, skin.id, manifestPath)

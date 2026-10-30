@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { displaySkins, resolveDisplayModel } from '../lib/constructs/display.ts'
-import { DEFAULT_FRAME, FRAMES, getConstruct, type ConstructConfig } from '../lib/constructs/index.ts'
+import { displaySkins, isDisplayFrame, resolveDisplayModel } from '../lib/constructs/display.ts'
+import { DEFAULT_FRAME, FRAMES, getConstruct, lendingFrames, type ConstructConfig } from '../lib/constructs/index.ts'
 
 const resolve = (frame: string | null, skin: string | null) => resolveDisplayModel(FRAMES, { frame, skin }, DEFAULT_FRAME)
 
@@ -42,4 +42,22 @@ test('Display lists every skin but a chibi', () => {
   }
   assert.deepEqual(displaySkins(getConstruct('shukra')).map((s) => s.name), ['Generic'])
   assert.deepEqual(displaySkins(getConstruct('pavo')).map((s) => s.name), ['Generic'])
+})
+
+// ---- Erza (add-erza-model): a frame with no clip set of its own is shown in Playground only ----
+
+test('Display offers Shukra and Pavo, not Erza', () => {
+  assert.deepEqual(FRAMES.filter(isDisplayFrame).map((f) => f.id), ['shukra', 'pavo'])
+  assert.deepEqual(FRAMES.filter(isDisplayFrame).map((f) => f.id), lendingFrames().map((f) => f.id), 'the Display frames are exactly the ones with a clip set')
+})
+
+test('a saved Erza (an edited record or an import) opens on Shukra Generic and the stored value is kept', () => {
+  const stored = { frame: 'erza', skin: 'erza-scarlet' }
+  assert.deepEqual(resolve(stored.frame, stored.skin), { frame: 'shukra', skin: 'r3qumd010011' })
+  assert.deepEqual(resolve('erza', null), { frame: 'shukra', skin: 'r3qumd010011' })
+  assert.deepEqual(stored, { frame: 'erza', skin: 'erza-scarlet' }, 'resolving changes nothing in what was stored')
+})
+
+test('a frame list with no Display frame left has nothing to show', () => {
+  assert.throws(() => resolveDisplayModel([getConstruct('erza')], { frame: 'erza', skin: 'erza-scarlet' }, 'erza'), /No frames to show/)
 })

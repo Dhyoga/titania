@@ -2,8 +2,8 @@
 
 UI and interaction design for the side panel of **Titania: Fairy Tail Companion**. The reference is the huaxu.app
 construct model page (the panel is carried over from the PGR companion, whose models come from there); the goal is to reproduce its
-viewer controls closely, adapted to a narrow side panel. Until `erza-only-companion` the panel shows Qu's two frames, Shukra and Pavo;
-Erza's models arrive with `add-erza-model`. Colors and sizes below are approximations read from screenshots;
+viewer controls closely, adapted to a narrow side panel. Until `erza-only-companion` the panel shows Qu's two frames, Shukra and Pavo,
+and, in Playground only, Erza (`add-erza-model`). Colors and sizes below are approximations read from screenshots;
 adjust them by eye against the reference.
 
 ## Principles
@@ -183,11 +183,15 @@ Board actions
 
 ## Frames
 
-Qu's two frames, **Shukra** and **Pavo**, are viewable (until `erza-only-companion` hides them: Qu is where Erza's motion and voice come
-from), and either frame's model plays the other's animations and voice lines. Each has its Generic skin only.
+**Erza**, first in the picker, and Qu's two frames, **Shukra** and **Pavo**, are viewable (until `erza-only-companion` hides Qu's: Qu is where
+Erza's motion and voice come from). Shukra's and Pavo's models play each other's animations and voice lines; **Erza's list is lent clips only**
+(she has no clip set or voice lines of her own): `Shukra · Idle`, `Shukra · Board actions`, `Pavo · Idle`, … with no group without a prefix, starting
+on `Shukra · UiStand1` (Menu) or `Shukra · Stand1` (Fight). Each frame has one skin; Erza's is `Erza Scarlet` with the initials tile `ES` (no icon).
+**Display does not offer her**: its Model popover and its Animations popover list Shukra and Pavo only, and a stored Display model of Erza opens on
+Shukra's Generic with the stored value untouched. In Playground she is shown like any frame; choosing her leaves the Display model as it was.
 
 - **Frame picker** (built): the header's name ("Shukra ⌄") opens a small dark list of the frames (the shown one marked; arrow keys,
-  Enter, Escape). The panel always opens on Shukra. Picking a frame loads its Generic and works like a skin switch: same context, the
+  Enter, Escape). The panel opens on the Display model's frame (Shukra by default). Picking a frame loads its Generic and works like a skin switch: same context, the
   clip of the same name (else the context's default clip), a moved camera, the display settings, voice volume, subtitles, the loop
   choice and mesh choices all carry over.
 - **Fight lists of every frame** follow the same cut: base-layer clips only, no Attacks, Reactions or `Squat*`, Movement only `Walk` and
@@ -206,13 +210,14 @@ from), and either frame's model plays the other's animations and voice lines. Ea
 - **How a borrowed clip looks**: the body moves as in its own frame (bones matched by name, corrected for the two rest poses, the pelvis
   scaled to the shown model's height); the face takes the source's expressions where the shown face has the same expression. **Hair,
   cloth and helper bones do not swing** on borrowed clips (there is no physics), but they hang as the shown model's own idle has them
-  (its mean pose). **A hand that rests on the hip** rests on the hip of the shown body too, whatever the arm lengths of the two models.
+  (its mean pose). **On Erza they hold their bind pose** (she has no idle of her own to take a mean from): her skirt, hair and ribbons stand
+  stiff, and her face (bone-driven, while Qu's clips animate morph targets) stays still. Known limits, not bugs. **A hand that rests on the hip** rests on the hip of the shown body too, whatever the arm lengths of the two models.
   **Weapons stay in hand**: a prop the shown model holds (Shukra's `Prop1` in the right hand, `Prop2` in the left) stays in that hand for
   the whole clip, instead of following the lending frame's own; a prop that does not sit on a hand at rest (Pavo's) is not driven.
   Meshes shown follow the shown skin's own rule for a clip of that name.
 - **Voice of a borrowed Board action**: its own frame's line and subtitle (Pavo's `BoardAct0201` speaks Pavo's line, whichever model
   performs it). When the line outlasts the clip, the shown model's own `UiStand1` takes over until the line ends, as described under
-  "Board action + voice". A Board action with no paired line plays silently without the speaker glyph.
+  "Board action + voice"; on Erza, which has none, it is the `UiStand1` of the frame the action comes from, retargeted onto her. A Board action with no paired line plays silently without the speaker glyph.
 - **Switching** keeps a borrowed clip by frame and name (`Pavo · BoardAct1005` stays selected on another skin); switching to the clip's
   own frame selects that frame's own clip of the name.
 
@@ -430,8 +435,13 @@ they always fit the panel), closing on outside click or `Esc`; one at a time; th
 - **Metal reflects**: parts the game marks as metal or glossy reflect a dim neutral studio by their own roughness, so polished trims show
   bright and dark bands and enamel soft streaks, and dark metal stays dark. Part of the toon look: off with the switch.
 - **Qu's models use the same material parameters** as Bianca's (the PGR shader reads them unchanged), so they render by these rules; how
-  close they come to the game is recorded in `AGENTS.md`. Erza's own shading (her diffuse and shadow-colour textures) comes with
-  `add-erza-model`, and `erza-only-companion` removes the paths that served only PGR models.
+  close they come to the game is recorded in `AGENTS.md`.
+- **Erza's own path** (her materials carry no PGR parameters): the **shadow-colour texture** (`_SH`, the game's flat, darker version of the diffuse
+  one) where the surface turns away from the light and the **diffuse texture** where it faces it, with a soft edge a few percent of N·L wide
+  (centre 0.1, half-width 0.04); the light direction and intensity are the Lighting popover's. No bands, ramps, highlights, self-shadow or
+  tone mapping: the textures are the look. Her **outline** is a thin dark line (about 1.4 px on screen at any zoom, 0.3 of the surface colour)
+  from her own geometry. The "Toon shading" switch shows her glTF material (the diffuse texture, lit neutrally) with no outline, as for every
+  model. `erza-only-companion` removes the paths that served only PGR models; this one stays.
 - Not built: the game's bloom (halo, eye glints; Shukra's model carries a `bloom` pass material that is not drawn; emission brightens the
   surface only, without a glow around it), animated emission, matcap sheen.
 
@@ -449,14 +459,16 @@ they always fit the panel), closing on outside click or `Esc`; one at a time; th
 
 - **Loading model**: stage shows a centered spinner, with a percent only when the loader knows the file size (files served from the extension have no size header, so usually just the spinner); controls disabled.
 - **Load error**: stage shows a short message and a Retry button; the rest of the panel stays usable.
-- **No clips** (a skin whose manifest is null; none among Qu's frames, kept for models without a clip set): the model stands in bind pose
+- **No clips** (a skin with no manifest *and* no frame lending it clips; none today, kept for models without a clip set; Erza has no manifest
+  but is lent every clip, so she is not in this state): the model stands in bind pose
   with nothing hidden; the dropdown reads "No animations" and is disabled, as are play/pause, scrubber, loop, playback options and the
   Fight/Menu toggle; camera, settings, lighting, screenshot and Focus work.
 - **Thumbnails missing**: a neutral placeholder tile with the skin's initials.
 
 ## Out of scope for now
 
-- Erza's models, her shading and her face (`add-erza-model`), and the Erza-only panel (`erza-only-companion`).
+- Erza's second model (Heaven's Wheel Armor), her sword, her face (bone-driven) and swinging hair, skirt and ribbons; the Erza-only panel
+  (`erza-only-companion`).
 - Swinging hair and cloth (physics) on clips borrowed from another frame.
 - The Voices tab (see "Voices").
 - English audio.

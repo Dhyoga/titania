@@ -244,6 +244,31 @@ export function parseToonMaterial(material: unknown, gltfTextures: readonly unkn
   }
 }
 
+/**
+ * The family of models that carry no PGR parameters (add-erza-model): `extras.family` is `diffuseShadow`, the base colour is the material's
+ * `baseColorTexture` and `extras.shadowTexture` is the glTF index of a shadow-colour texture with the same UV layout. Separate from
+ * `parseToonMaterial` on purpose: the PGR families stay as they are.
+ */
+export interface DiffuseShadowParams {
+  name: string
+  /** glTF texture index of the base-colour texture (the lit colour). */
+  base: number
+  /** glTF texture index of the shadow-colour texture. */
+  shadow: number
+  doubleSided: boolean
+}
+
+/** Null for any other material, and for a `diffuseShadow` one without both textures. */
+export function parseDiffuseShadowMaterial(material: unknown): DiffuseShadowParams | null {
+  if (!isObject(material) || !isObject(material.extras) || material.extras.family !== 'diffuseShadow') return null
+  const pbr = isObject(material.pbrMetallicRoughness) ? material.pbrMetallicRoughness : {}
+  const base = isObject(pbr.baseColorTexture) ? pbr.baseColorTexture.index : undefined
+  const shadow = material.extras.shadowTexture
+  const index = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0
+  if (!index(base) || !index(shadow)) return null
+  return { name: typeof material.name === 'string' ? material.name : '', base, shadow, doubleSided: material.doubleSided === true }
+}
+
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value))
 }

@@ -1,5 +1,5 @@
 import { computed, onBeforeUnmount, ref, shallowRef, watch, type Ref } from 'vue'
-import { buildCatalog, hiddenNodesFor, ownItemId, resolveFightIdle, withSources, type AnimationSource, type Catalog, type CatalogItem, type ContextId } from '~/lib/anim/catalog'
+import { buildCatalog, hiddenNodesFor, resolveFightIdle, withSources, type AnimationSource, type Catalog, type CatalogItem, type ContextId } from '~/lib/anim/catalog'
 import type { Clip } from '~/lib/anim/clip'
 import type { AnimManifest, ClipEntry } from '~/lib/anim/manifest'
 import { loadClip, loadGlbJson, loadManifest } from '~/lib/anim/loader'
@@ -40,10 +40,14 @@ interface Preparing {
   promise: Promise<void>
 }
 
-/** A session whose skin has clips. */
-type ClipSession = ViewerSession & { manifest: AnimManifest; manifestPath: string }
-
-const hasClips = (s: ViewerSession | null): s is ClipSession => s !== null && s.manifest !== null && s.manifestPath !== null
+/** The shown model's own idle clip, or the idle of the frame a lent action comes from: what a voiced timeline falls back on. */
+interface IdleRequest {
+  key: string
+  entry: ClipEntry
+  rootNode: number
+  /** The decoded clip, ready for the shown model (null when `key` is already cached). */
+  load: (signal: AbortSignal) => Promise<Clip | null>
+}
 
 /** Seconds per step of the frame-step shortcuts; the clips are keyed at 30 fps. */
 const FRAME_STEP = 1 / 30
@@ -84,12 +88,20 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
   /** Subtitle cues of the voice line playing with the selected clip; null when there is none. Plain data, kept shallow. */
   const cues = shallowRef<Cue[] | null>(null)
 
+  /** Set once every frame's data has been read: until then a frame with no clip set of its own has no sources yet, which is not "no animations". */
+  const framesRead = ref(false)
+
+  /** The shown model can play something: it has a clip set of its own, or at least one other frame lends it clips. */
+  const canPlay = (s: ViewerSession | null): s is ViewerSession => s !== null && (s.manifest !== null || lent.value.some((l) => l.frame !== s.construct.id))
+
   const catalog = computed<Catalog | null>(() => {
     const current = session.value
-    if (!current?.manifest) return null
-    const own = buildCatalog(current.manifest, context.value)
+    if (!current) return null
     const frame = current.construct.id
-    return withSources(own, lent.value.filter((s) => s.frame !== frame), context.value, lent.value.find((s) => s.frame === frame))
+    const others = lent.value.filter((s) => s.frame !== frame)
+    // A frame with no clip set of its own (Erza) has no own groups: its list is the sources' groups only.
+    if (!current.manifest) return withSources(null, others, context.value)
+    return withSources(buildCatalog(current.manifest, context.value), others, context.value, lent.value.find((s) => s.frame === frame))
   })
   const items = computed(() => new Map((catalog.value?.groups ?? []).flatMap((g) => g.items).map((i) => [i.id, i])))
   /** Voice pairing of the frame an item comes from. */
@@ -135,10 +147,12 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
   function loadFrameData(): Promise<void> {
     frameData ??= Promise.all(
       FRAMES.map(async (frame) => {
+        const src = frame.animationSource
+        // No clip set of its own: nothing to lend, and no voice lines either (so no request, no warning in the console).
+        if (!src) return { frame: frame.id, source: null, voices: null }
         let source: AnimationSource | null = null
         try {
           const read = (path: string) => loadManifest(assetUrl(frame.id, path))
-          const src = frame.animationSource
           const [manifest, ...extras] = await Promise.all([read(src.manifest), ...src.extras.map((e) => read(e.manifest))])
           source = {
             frame: frame.id,
@@ -164,6 +178,7 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
     ).then((results) => {
       lent.value = results.flatMap((r) => (r.source ? [r.source] : []))
       voicesByFrame.value = new Map(results.flatMap((r) => (r.voices ? [[r.frame, r.voices] as const] : [])))
+      framesRead.value = true
     })
     return frameData
   }
@@ -218,10 +233,10 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
   /** Name, frame, length and loop flag of an item of the current list, own or lent; null when the list has no such item. */
   function itemInfo(id: Selection): { name: string; frame: string; duration: number; loop: boolean } | null {
     const current = session.value
-    if (!current?.manifest) return null
+    if (!current) return null
     const item = items.value.get(id)
     if (!item) return null
-    const entry = item.source ? sourceManifestOf(item)?.clips[item.clip] : current.manifest.clips[item.clip]
+    const entry = item.source ? sourceManifestOf(item)?.clips[item.clip] : current.manifest?.clips[item.clip]
     if (!entry) return null
     return { name: item.name, frame: item.source?.frame ?? current.construct.id, duration: entry.duration, loop: entry.loop }
   }
@@ -233,14 +248,24 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
     return (item && voices ? voiceFor(voices, item.name)?.title : undefined) ?? null
   }
 
-  /** The clip's root node: a lent clip carries the shown model's node indices, so the shown model's root rule applies. */
-  function rootNodeOf(current: ClipSession, item: CatalogItem, req: PlayRequest): number {
+  /**
+   * The clip's root node: a lent clip carries the shown model's node indices, so the shown model's root rule applies: its idle clip's root, or
+   * for a model with no clip set of its own the shown rig's `Bip001` (the pelvis, whose position track is its height).
+   */
+  function rootNodeOf(current: ViewerSession, item: CatalogItem, req: PlayRequest): number {
     const { manifest } = current
-    return item.source ? (manifest.clips[manifest.contexts.menu.idle.clip]?.rootNode ?? req.entry.rootNode) : req.entry.rootNode
+    if (!item.source) return req.entry.rootNode
+    if (manifest) return manifest.clips[manifest.contexts.menu.idle.clip]?.rootNode ?? req.entry.rootNode
+    return current.viewer.getRig()?.byName.get('Bip001') ?? req.entry.rootNode
+  }
+
+  /** Nodes hidden for a context and clip name: the manifest's rule, or none for a model with no manifest (only the user hides parts). */
+  function hiddenFor(current: ViewerSession, ctx: ContextId, clipName: string | null): number[] {
+    return current.manifest ? hiddenNodesFor(current.manifest, ctx, clipName) : []
   }
 
   /** The voice line of a Board action in the Menu context (its own frame's), or null. */
-  function lineOf(current: ClipSession, item: CatalogItem, name: string): { url: string; text: string | undefined } | null {
+  function lineOf(current: ViewerSession, item: CatalogItem, name: string): { url: string; text: string | undefined } | null {
     const voices = context.value === 'menu' ? voicesOf(item) : undefined
     const line = voices ? voiceFor(voices, name) : undefined
     if (!voices || !line) return null
@@ -248,19 +273,32 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
     return { url: assetUrl(origin, voiceAudioPath(voices, line)), text: line.text }
   }
 
-  /** The shown model's Menu idle clip: what a voiced timeline falls back on when the line outlasts the clip. */
-  function idleOf(current: ClipSession): { key: string; url: string; entry: ClipEntry } {
-    const { manifest, manifestPath, construct } = current
-    const index = manifest.contexts.menu.idle.clip
-    const entry = manifest.clips[index]!
-    return { key: `${construct.id}/${manifestPath}#${index}`, url: assetUrl(construct.id, resolveClipPath(manifestPath, entry.file)), entry }
+  /**
+   * What a voiced timeline falls back on when the line outlasts the clip: the shown model's own Menu idle clip, or, for a model with no clip
+   * set of its own, the Menu idle (`UiStand1`) of the frame the action comes from, retargeted onto the shown model like any lent clip.
+   */
+  function idleOf(current: ViewerSession, item: CatalogItem): IdleRequest | null {
+    const { viewer, manifest, manifestPath, construct } = current
+    if (manifest && manifestPath) {
+      const index = manifest.contexts.menu.idle.clip
+      const entry = manifest.clips[index]!
+      const key = `${construct.id}/${manifestPath}#${index}`
+      const url = assetUrl(construct.id, resolveClipPath(manifestPath, entry.file))
+      return { key, entry, rootNode: entry.rootNode, load: (signal) => (viewer.hasClip(key) ? Promise.resolve(null) : loadClip(url, entry.name, { signal })) }
+    }
+    const lender = lent.value.find((s) => s.frame === item.source?.frame)
+    if (!lender) return null
+    const idleItem = items.value.get(`${lender.frame}:${lender.manifestPath}#${lender.manifest.contexts.menu.idle.clip}`)
+    const req = idleItem ? request(current, idleItem) : null
+    return idleItem && req ? { key: req.key, entry: req.entry, rootNode: rootNodeOf(current, idleItem, req), load: req.load } : null
   }
 
   /** How to play `item` on the shown model: its own clip, or another frame's clip retargeted (the key names the frame and the skin). */
-  function request(current: ClipSession, item: CatalogItem): PlayRequest | null {
+  function request(current: ViewerSession, item: CatalogItem): PlayRequest | null {
     const { viewer, manifest, manifestPath, construct, skin } = current
     if (!item.source) {
-      const entry = manifest.clips[item.clip]
+      const entry = manifest?.clips[item.clip]
+      if (!manifest || !manifestPath) return null
       if (!entry) return null
       // The frame is part of the key: every frame has an `anim/manifest.json`, so the path alone does not name a clip.
       const key = `${construct.id}/${manifestPath}#${item.clip}`
@@ -274,8 +312,9 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
     // The fill pose depends on the shown skin and the context, so the key names both.
     const key = `${frame}/${sourcePath}#${item.clip}@${construct.id}/${skin.id}/${context.value}`
     const url = assetUrl(frame, resolveClipPath(sourcePath, entry.file))
-    const idleEntry = manifest.clips[context.value === 'menu' ? manifest.contexts.menu.idle.clip : resolveFightIdle(manifest)]
-    const idleUrl = idleEntry ? assetUrl(construct.id, resolveClipPath(manifestPath, idleEntry.file)) : null
+    // The fill pose is the shown model's own idle clip; a model with no clip set of its own has none, so what the sources do not drive keeps its bind pose.
+    const idleEntry = manifest?.clips[context.value === 'menu' ? manifest.contexts.menu.idle.clip : resolveFightIdle(manifest)]
+    const idleUrl = idleEntry && manifestPath ? assetUrl(construct.id, resolveClipPath(manifestPath, idleEntry.file)) : null
     return {
       id: item.id,
       key,
@@ -298,13 +337,13 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
   /** `loop` overrides the loop choice for this clip (the lobby director's idles loop and its actions end, whatever the user chose). */
   async function select(choice: Selection, play: { loop?: boolean } = {}): Promise<SelectResult> {
     const current = session.value
-    if (!hasClips(current)) return { status: 'failed' }
-    const { viewer, manifest } = current
+    if (!canPlay(current)) return { status: 'failed' }
+    const { viewer } = current
     cancelLoad()
     error.value = ''
 
     if (choice === BIND) {
-      viewer.bindPose(hiddenNodesFor(manifest, context.value, null))
+      viewer.bindPose(hiddenFor(current, context.value, null))
       cues.value = null
       selected.value = BIND
       return { status: 'started' }
@@ -317,10 +356,10 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
       rootNode: rootNodeOf(current, item, req),
       loop: play.loop ?? loopChoice ?? req.entry.loop,
       // Visibility follows the shown skin's rule for a clip of that name (Board action names are shared by every frame).
-      hiddenNodes: hiddenNodesFor(manifest, context.value, req.entry.name),
+      hiddenNodes: hiddenFor(current, context.value, req.entry.name),
     }
     const line = lineOf(current, item, req.entry.name)
-    if (line) return playVoiced(current, { ...req, line }, options)
+    if (line) return playVoiced(current, item, { ...req, line }, options)
 
     const controller = new AbortController()
     loadAbort = controller
@@ -352,9 +391,13 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
    * together (one abort for all), unless `prepare` has them ready. The line is optional: if it cannot be fetched, decoded or heard,
    * the clip plays without one.
    */
-  async function playVoiced(current: ClipSession, req: PlayRequest & { line: NonNullable<PlayRequest['line']> }, options: PlayClipOptions): Promise<SelectResult> {
-    const { viewer, manifest } = current
-    const idle = idleOf(current)
+  async function playVoiced(current: ViewerSession, item: CatalogItem, req: PlayRequest & { line: NonNullable<PlayRequest['line']> }, options: PlayClipOptions): Promise<SelectResult> {
+    const { viewer } = current
+    const idle = idleOf(current, item)
+    if (!idle) {
+      error.value = `No idle clip to follow ${req.entry.name} with`
+      return { status: 'failed' }
+    }
     const controller = new AbortController()
     loadAbort = controller
     pending.value = req.id
@@ -367,7 +410,7 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
       line = taken
       const [clip, idleClip, loaded] = await Promise.all([
         req.load(controller.signal),
-        viewer.hasClip(idle.key) ? Promise.resolve(null) : loadClip(idle.url, idle.entry.name, { signal: controller.signal }),
+        idle.load(controller.signal),
         taken
           ? Promise.resolve(taken)
           : loadVoiceLine(req.line.url, audioBytes, controller.signal).catch((err: unknown) => {
@@ -377,7 +420,7 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
       ])
       line = loaded
       if (controller.signal.aborted || session.value !== current) return { status: 'superseded' } // a newer selection (or a new model) won
-      if (idleClip) viewer.cacheClip(idle.key, idleClip, { rootNode: idle.entry.rootNode })
+      if (idleClip) viewer.cacheClip(idle.key, idleClip, { rootNode: idle.rootNode })
 
       let voice: VoiceOptions | undefined
       let lineCues: Cue[] | null = null
@@ -394,7 +437,7 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
             release,
           }),
           timeline,
-          idle: { key: idle.key, hiddenNodes: hiddenNodesFor(manifest, 'menu', idle.entry.name) },
+          idle: { key: idle.key, hiddenNodes: hiddenFor(current, 'menu', idle.entry.name) },
         }
         line = null // the clock owns it now (the viewer disposes the clock, which releases the line)
       }
@@ -423,7 +466,7 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
    */
   function prepare(id: Selection): Promise<void> {
     const current = session.value
-    if (!hasClips(current) || context.value !== 'menu') return Promise.resolve()
+    if (!canPlay(current) || context.value !== 'menu') return Promise.resolve()
     if (prepared?.id === id) return Promise.resolve()
     if (preparing?.id === id) return preparing.promise
     const item = items.value.get(id)
@@ -438,17 +481,17 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
       let line: VoiceLine | null = null // released unless the slot takes it
       try {
         const voiced = lineOf(current, item, req.entry.name)
-        const idle = idleOf(current)
+        const idle = voiced ? idleOf(current, item) : null
         const rootNode = rootNodeOf(current, item, req)
         const [clip, idleClip, loaded] = await Promise.all([
           req.load(controller.signal),
-          voiced && !viewer.hasClip(idle.key) ? loadClip(idle.url, idle.entry.name, { signal: controller.signal }) : Promise.resolve(null),
+          idle ? idle.load(controller.signal) : Promise.resolve(null),
           voiced ? loadVoiceLine(voiced.url, audioBytes, controller.signal).catch(() => null) : Promise.resolve(null),
         ])
         line = loaded
         if (controller.signal.aborted || session.value !== current || preparing !== job) return
         if (clip) viewer.cacheClip(req.key, clip, { rootNode })
-        if (idleClip) viewer.cacheClip(idle.key, idleClip, { rootNode: idle.entry.rootNode })
+        if (idle && idleClip) viewer.cacheClip(idle.key, idleClip, { rootNode: idle.rootNode })
         prepared = { id, line }
         line = null // the slot owns it now
       } catch (err) {
@@ -471,11 +514,11 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
 
   /** Switch to a context and play its default clip. */
   function setContext(next: ContextId): void {
-    if (!hasClips(session.value)) return
+    if (!canPlay(session.value)) return
     context.value = next
     selected.value = null
-    const defaultClip = catalog.value?.defaultClip
-    if (defaultClip !== undefined) void select(ownItemId(defaultClip))
+    const defaultItem = catalog.value?.defaultItem
+    if (defaultItem !== undefined) void select(defaultItem)
   }
 
   /**
@@ -560,7 +603,7 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
   // default clip. A model without clips (the chibi) just stands in its bind pose. The frames' data is read first, so a remembered
   // Board action plays with its line.
   function begin(current: ViewerSession): void {
-    if (!hasClips(current)) return
+    if (!canPlay(current)) return
     if (options.takeOver?.()) return // the lobby director starts the first clip
     const want = remembered
     context.value = want?.context ?? 'menu'
@@ -574,9 +617,9 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
       const candidates = all.filter(ofFrame).sort((a, b) => Number(a.source !== null) - Number(b.source !== null))
       choice = (candidates.find((i) => i.label === clip.label) ?? candidates.find((i) => i.name === clip.name))?.id
     }
-    const fallback = catalog.value?.defaultClip
+    const fallback = catalog.value?.defaultItem
     if (choice !== undefined) void select(choice)
-    else if (fallback !== undefined) void select(ownItemId(fallback))
+    else if (fallback !== undefined) void select(fallback)
   }
 
   watch(
@@ -607,6 +650,8 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
     isBindPose,
     hasClip,
     ready: computed(() => session.value !== null),
+    /** Every frame's clip sets are read: the list is complete (a frame with no clip set of its own has none before). */
+    framesRead,
     select,
     setContext,
     useMenuContext,

@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import { buildCatalog, withSources, type AnimationSource } from '../lib/anim/catalog.ts'
 import { parseManifest } from '../lib/anim/manifest.ts'
-import { FRAMES, getConstruct, type LobbyConfig } from '../lib/constructs/index.ts'
+import { getConstruct, lendingFrames, type LobbyConfig } from '../lib/constructs/index.ts'
 import { defaultChoice, listCandidates, resolvePool, type LobbyPool, type PoolItem } from '../lib/lobby/pool.ts'
 import { parseVoices, voiceFor, type Voices } from '../lib/voice/voices.ts'
 
@@ -176,6 +176,8 @@ test('a single own idle takes the whole weight', () => {
 // ---- the real frames ----
 
 const dataDir = new URL('../data/', import.meta.url)
+// Frames with a clip set: Erza (add-erza-model) is not a Display model and lends nothing.
+const FRAMES = lendingFrames()
 const skip = !FRAMES.every((f) => existsSync(new URL(`${f.id}/anim/manifest.json`, dataDir)) && existsSync(new URL(`${f.id}/voices.json`, dataDir))) && 'data/ is not present (voices.json comes from build_voices.py)'
 
 const readJson = (url: URL): unknown => JSON.parse(readFileSync(url, 'utf8'))
@@ -187,9 +189,9 @@ function realPool(frame: string, skinId: string, chosen: string[] | null = null)
   const sources: AnimationSource[] = FRAMES.map((f) => ({
     frame: f.id,
     label: f.displayName,
-    manifestPath: f.animationSource.manifest,
-    manifest: manifestOf(f.id, f.animationSource.manifest),
-    extras: f.animationSource.extras.map((e) => ({ manifestPath: e.manifest, manifest: manifestOf(f.id, e.manifest), clips: e.clips, label: e.label, replace: e.replace })),
+    manifestPath: f.animationSource!.manifest,
+    manifest: manifestOf(f.id, f.animationSource!.manifest),
+    extras: f.animationSource!.extras.map((e) => ({ manifestPath: e.manifest, manifest: manifestOf(f.id, e.manifest), clips: e.clips, label: e.label, replace: e.replace })),
   }))
   const construct = getConstruct(frame)
   const skin = construct.skins.find((s) => s.id === skinId)!

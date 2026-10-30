@@ -1,0 +1,28 @@
+## MODIFIED Requirements
+
+### Requirement: Active construct assets are packaged with the extension
+Every build (dev and production) SHALL make the served paths of every frame in the frame list — for Shukra and Pavo: `models/`, `anim/`,
+`voices_ja/`, `voices.json` and `icons/`; for Erza: `models/` and `icons/` — available inside the extension output under `/<constructId>/`, either as
+symlinks into `data/<constructId>/` or as copies. Paths not listed (constructs outside the frame list, `anim-skins/`, `voices_en/`, `wiki/`, Erza's
+`source/`) SHALL NOT be included. A served path that does not exist in `data/<constructId>/` (for example `icons/` or `voices.json` before they have
+been generated, or Erza's `models/` before the conversion) SHALL be skipped with a warning; the build SHALL NOT fail and SHALL NOT leave a dangling link for it.
+
+#### Scenario: Served paths present
+- **WHEN** `pnpm build` finishes
+- **THEN** `dist/chrome-mv3/` contains `shukra/` and `pavo/`, each with `models/`, `anim/`, `voices_ja/`, and `voices.json` and `icons/` when they exist in `data/`, and `erza/` with `models/` (and `icons/` when it exists), and no other construct folder
+
+#### Scenario: Erza's source is not served
+- **WHEN** `data/erza/source/` holds the FBX and its textures and `pnpm build` runs
+- **THEN** `dist/chrome-mv3/erza/` contains no `source`
+
+#### Scenario: Dev build
+- **WHEN** `pnpm dev` builds or rebuilds the extension
+- **THEN** the same served paths are present in the dev output
+
+#### Scenario: Optional path missing
+- **WHEN** `data/pavo/icons/` does not exist and `pnpm build` runs
+- **THEN** the build succeeds with a warning naming `pavo` and `icons`, and `dist/chrome-mv3/pavo/icons` does not exist
+
+#### Scenario: Erza not converted yet
+- **WHEN** `data/erza/models/` does not exist and `pnpm build` runs
+- **THEN** the build succeeds with a warning naming `erza` and `models`, and no link is left for it

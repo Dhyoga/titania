@@ -4,8 +4,9 @@ A browser extension that opens a side panel with a 3D viewer for **Erza Scarlet*
 voice lines of her own, so her motion and voice come from **Qu** of *Punishing: Gray Raven*, who shares her voice actress. Qu's two frames,
 **Shukra** and **Pavo**, supply the clips and the voice lines. Everything is rendered locally with three.js.
 
-Right now the panel shows Qu's two frames themselves, with their Generic skins, animations and voice lines: this is the base that Erza's
-models are added to (`add-erza-model`) and that then shows only Erza (`erza-only-companion`). The history is in `openspec/`.
+Right now the panel shows Qu's two frames with their Generic skins, animations and voice lines, and **Erza Scarlet** in Playground, where she
+plays Shukra's and Pavo's clips (retargeted onto her) with their voice lines (`add-erza-model`). Display still shows Qu; the panel will show only
+Erza with `erza-only-companion`. The history is in `openspec/`.
 
 This is a **personal, unofficial fan project**. It is loaded unpacked and will never be published. *Fairy Tail* and Erza Scarlet belong to
 their rights holders, and Erza's source models to the game they come from. *Punishing: Gray Raven*, its models, animations and voice lines
@@ -38,11 +39,13 @@ never change the Display model. The header's **Display** button goes back (Displ
 
 ## Features
 
-- Two frames (Shukra, Pavo), picked from the header, each with its Generic skin in a skin strip (in Playground). A **Focus** mode hides
+- Three frames (Erza, Shukra, Pavo), picked from the header, each with its one skin in a skin strip (in Playground). A **Focus** mode hides
   both and the **player** can be hidden too, so the stage can fill the whole panel.
-- Menu and Fight animation lists; either frame's model can play the other's clips (retargeted at runtime, nothing is written to `data/`).
+- Menu and Fight animation lists; Shukra's and Pavo's models can play each other's clips, and Erza plays both frames' (retargeted at runtime,
+  nothing is written to `data/`). Her skirt, hair, ribbons and face do not move: there is nothing to take that motion from yet.
 - Board actions play with their Japanese voice line and English subtitles, where a line is paired (see "The data").
-- Toon shading with outlines, metal reflections and emission (switchable back to the model's own materials).
+- Toon shading with outlines (switchable back to the model's own materials): Qu's models with metal reflections and emission, Erza from her
+  diffuse and shadow-colour textures.
 - Per-mesh show/hide (the puzzle button), lighting, backgrounds, grid, auto-rotate, follow animation (on by default), playback speed
   from 0.25× to 2×, screenshots.
 - Orbit, pan and zoom (towards the pointer) with the mouse or touch.
@@ -86,8 +89,8 @@ button in the stage menu opens them:
 
 - [Node.js](https://nodejs.org) 22.18 or newer (the tests run TypeScript directly; developed on 24), [pnpm](https://pnpm.io) and Python 3.
 - A Chromium browser with side panel support (Chrome).
-- The `data/` folder (not in the repository, git-ignored; about 100 MB). It holds Shukra's and Pavo's Generic models, clips, voice lines and
-  icons, in the layout described in [AGENTS.md](AGENTS.md). It is made with the Python scripts in the repository root, which download
+- The `data/` folder (not in the repository, git-ignored; about 100 MB plus Erza's). It holds Shukra's and Pavo's Generic models, clips, voice
+  lines and icons, and Erza's source and converted model, in the layout described in [AGENTS.md](AGENTS.md). It is made with the Python scripts in the repository root, which download
   from the wiki the game data comes from, so run them only when you mean to (each documents its usage at the top):
 
   ```bash
@@ -96,8 +99,16 @@ button in the stage menu opens them:
   python3 build_voices.py shukra pavo         # each frame's voices.json, from voice_pairings.json
   ```
 
-- The Erza source folders (`Erza Scarlet/`, `Erza Scarlet (Heaven's Wheel Armor)/`) sit in the repository root, git-ignored, and are used from
-  `add-erza-model` on.
+- Erza's source folder, `data/erza/source/Erza Scarlet/` (`Model.fbx` and its PNGs; the DAE and OBJ are not used), is converted offline into
+  `data/erza/models/erza-scarlet.glb` (Node 22.18 or newer; run it again after changing the script, then rebuild):
+
+  ```bash
+  node scripts/convert-fbx.ts "data/erza/source/Erza Scarlet"           # her body; the sword is left out
+  node scripts/convert-fbx.ts "data/erza/source/Erza Scarlet" --weapon  # also the sword, as a second mesh (for experiments)
+  ```
+
+  The script reads only the source folder, writes only under `data/erza/`, and gives the same file every time. `Erza Scarlet (Heaven's Wheel Armor)/`
+  stays in the repository root, untouched and unused for now (the script converts it too: pass its folder).
 
 ## The data
 

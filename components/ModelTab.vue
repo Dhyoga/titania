@@ -41,7 +41,10 @@ const props = defineProps<{
   mode: Mode
   /** The saved Display model, which the Display menu's Model popover edits. */
   displayModel: ModelChoice
+  /** Every frame, in the picker's order. */
   frames: { id: string; name: string }[]
+  /** The frames the Display menu offers: those with a clip set of their own. */
+  displayFrames: { id: string; name: string }[]
 }>()
 const emit = defineEmits<{
   /** Playground's skin strip chose a skin (temporary: App.vue holds it). */
@@ -92,8 +95,8 @@ const loop = computed({
 })
 const disabled = computed(() => !playback.ready.value)
 const controlsDisabled = computed(() => !playback.hasClip.value)
-/** The shown skin has no clips (the chibi). */
-const noClips = computed(() => playback.ready.value && !playback.catalog.value)
+/** The shown model has no clip set of its own and no frame lends it one (the chibi); a frame with sources only (Erza) has clips. */
+const noClips = computed(() => playback.ready.value && playback.framesRead.value && !playback.catalog.value)
 const shownSkin = computed(() => construct.value.skins.find((s) => s.id === skin.value) ?? construct.value.skins[0]!)
 
 // ---- Player hidden state ----
@@ -406,7 +409,7 @@ useViewerKeys({
         <template #popover>
           <Popover v-if="openPopover === 'model'" label="Display model" placement="down" @close="openPopover = null">
             <DisplayModelPopover
-              :frames="frames"
+              :frames="displayFrames"
               :frame="displayConstruct"
               :skin="displayModel.skin"
               :loading="status === 'loading' ? skin : null"
@@ -416,7 +419,7 @@ useViewerKeys({
           </Popover>
           <Popover v-else-if="openPopover === 'animations' && lobbyPool" label="Display animations" placement="down" @close="openPopover = null">
             <DisplayAnimationsPopover
-              :frames="frames"
+              :frames="displayFrames"
               :display-frame="lobbyPool.frame"
               :candidates="lobbyPool.pool.candidates"
               :chosen="lobbyPool.chosen"
