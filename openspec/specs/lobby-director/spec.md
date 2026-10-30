@@ -1,7 +1,7 @@
 # lobby-director Specification
 
 ## Purpose
-What Display does on its own: a random Board action with its voice line on open and on every tap (a tap interrupts), varied idles with a minimum dwell, the next action prepared in advance, sleep after 2 minutes without input, and how the director stops outside Display. (Purpose TBD, synced from change add-lobby-director.)
+What Display does on its own: a random Board action with its voice line on open and on every tap (a tap interrupts), idles picked from Menu and Fight clips (clips that do not loop play once) with a minimum dwell, the next action prepared in advance, no sleep, and how the director stops outside Display. (Purpose TBD, synced from change add-lobby-director.)
 
 ## Requirements
 
@@ -26,7 +26,7 @@ clock's start window the action SHALL run silently (see `board-voice`).
 
 #### Scenario: Back from Fight
 - **WHEN** Playground was in the Fight context and the panel is switched to Display
-- **THEN** Display idles on its Menu idles, and a tap starts a Board action
+- **THEN** Display idles on its idles (Menu and Fight, see "Idle is varied"), and a tap starts a Board action
 
 #### Scenario: Refused audio
 - **WHEN** the browser refuses to start the voice line on open
@@ -132,43 +132,6 @@ stay in idle until the next tap. The action SHALL end with the loop off whatever
 - **WHEN** the loop was turned on in Playground and Display plays an action
 - **THEN** the action still ends and the model idles
 
-### Requirement: Idle is varied
-In idle Display SHALL play `UiStand1` of the shown skin's own clip set (when it has it), always, and the `UiStand1` of the other frame when
-the user has chosen it for the Display frame (or, with no choice saved, of every frame in its construct configuration's `lobby.idleFrom`:
-Shukra: Pavo; Pavo: Shukra), borrowed as in Playground, the own clip taking 75 % of the picks and the borrowed ones together 25 % (split
-evenly over them); when nothing is borrowed, the own clip alone. `StandAct0101` SHALL NOT be played in Display, on any frame, own or
-borrowed, and SHALL NOT be offered. Repeats are allowed. A chosen idle SHALL play whole loops for at least 10 s (the number of loops is the
-smallest that reaches 10 s, to within 0.05 s), and the next idle SHALL be chosen at the end of its last loop; a different one crossfades in
-over 0.25 s, the same one just goes on looping. The meshes shown follow the shown skin's rule for a clip of that name.
-
-#### Scenario: Dwell
-- **WHEN** Pavo's `UiStand1` (6.0 s) is chosen
-- **THEN** it plays twice (12 s) before the next choice
-
-#### Scenario: Long idle
-- **WHEN** Shukra's `UiStand1` (17.0 s) is chosen
-- **THEN** it plays once before the next choice
-
-#### Scenario: Another idle
-- **WHEN** an idle ends its last loop and the other frame's `UiStand1` is chosen
-- **THEN** it crossfades in from the start, with no frame in bind pose
-
-#### Scenario: Same idle again
-- **WHEN** the same idle is chosen again
-- **THEN** it keeps looping with no restart
-
-#### Scenario: Share of borrowed idles
-- **WHEN** 400 idles are chosen on Shukra with the default choice
-- **THEN** between 20 % and 30 % of them are Pavo's
-
-#### Scenario: No StandAct0101
-- **WHEN** 400 idles are chosen on either frame with any choice
-- **THEN** none of them is `StandAct0101`, own or borrowed
-
-#### Scenario: Own idle alone
-- **WHEN** the user has cleared Pavo's `UiStand1` for Shukra
-- **THEN** the idle is Shukra's own `UiStand1`, which just goes on looping at the end of each dwell
-
 ### Requirement: The next action is prepared in advance
 While Display idles or plays an action, the next action of the bag SHALL be prepared: its clip built and cached in the viewer, and its voice
 line fetched, decoded and encoded. A tap SHALL start a prepared action without fetching, decoding or
@@ -187,27 +150,6 @@ When the preparing fails the action SHALL be loaded when it is started, as in Pl
 - **WHEN** the panel is switched to Playground while an action is prepared
 - **THEN** the prepared line is released
 
-### Requirement: Sleep
-After 2 minutes without input, at the end of an idle loop (the next wrap of the idle that plays), Display SHALL pause the pose so that the viewer renders nothing. Input
-is a tap, a key, any use of the Display menu, its popovers and the adjust bar, and entering Display. Display SHALL NOT sleep while an
-action plays or while Adjust camera is on. A tap while asleep SHALL wake Display and start an action.
-
-#### Scenario: Falls asleep
-- **WHEN** Display has been in idle for 2 minutes with no input
-- **THEN** at the end of the current idle loop the pose is paused and no frame is rendered during the next 2 s
-
-#### Scenario: Wake
-- **WHEN** the stage is tapped while Display sleeps
-- **THEN** the pose resumes and an action starts
-
-#### Scenario: Not during an action
-- **WHEN** a 50 s action plays 1 min 50 s after the last input
-- **THEN** it plays to its end and Display idles; sleep comes at the end of an idle loop 2 minutes after the last input
-
-#### Scenario: Input resets the time
-- **WHEN** the Display menu is used 1 min 50 s after the last input
-- **THEN** Display does not sleep for another 2 minutes
-
 ### Requirement: Display plays at normal speed
 Display SHALL play its clips and voice lines at normal speed (1×) whatever playback speed was set in Playground; the Playground speed SHALL
 be applied again when Playground is entered.
@@ -215,18 +157,6 @@ be applied again when Playground is entered.
 #### Scenario: Slow Playground
 - **WHEN** the speed is 0.25× in Playground and the panel is switched to Display
 - **THEN** the idle and the actions play at 1×, and back in Playground the speed is 0.25× again
-
-### Requirement: The director stops outside Display
-Leaving Display SHALL stop the director: no timer runs, no action starts by itself in Playground, a sleeping pose resumes, and the
-prepared line is released. The clip that was playing carries over to Playground as the selected clip.
-
-#### Scenario: Playground after an action
-- **WHEN** the panel is switched to Playground while an action plays
-- **THEN** the action goes on and is the selected clip in the player, and no new action starts when it ends
-
-#### Scenario: Playground after sleep
-- **WHEN** the panel is switched to Playground while Display sleeps
-- **THEN** the pose is playing again
 
 ### Requirement: A failed action does not stop the lobby
 When an action cannot be loaded or played, Display SHALL warn in the console, drop that action from the bag for this model, and carry on
@@ -285,3 +215,122 @@ prepared in advance as before.
 #### Scenario: Prepared action removed
 - **WHEN** the prepared next action is removed from the pool
 - **THEN** another action is prepared, and the next tap starts an action that is in the pool
+
+### Requirement: Display keeps playing
+Display SHALL NOT pause the pose on its own. With no input, the idles SHALL go on being picked and played (see "Idle is varied") for as long
+as Display is shown; only a tap, leaving Display or another Display model changes what plays.
+
+#### Scenario: Long without input
+- **WHEN** Display has idled on Shukra's Generic for 5 minutes with no input
+- **THEN** an idle clip is still playing, frames are still rendered, and idles have changed at the end of their dwell
+
+#### Scenario: Tap after a long wait
+- **WHEN** the stage is tapped after 5 minutes without input
+- **THEN** an action starts as after any other tap
+
+### Requirement: A clip that does not loop plays once
+An idle candidate whose manifest entry does not loop (`Born`, `Standchange`, `Win`, `LevelAttack14`) SHALL play once from its start to its end,
+whatever its length and whatever the loop choice of Playground, and the next idle SHALL then be chosen as at the end of a looping idle's
+dwell. When it is chosen again it SHALL start again from its start. A tap during it SHALL start an action as in any idle.
+
+#### Scenario: Win
+- **WHEN** Shukra's `Win` (6.67 s) is chosen
+- **THEN** it plays once, and at its end another idle (or `Win` again, from its start) crossfades in
+
+#### Scenario: The entrance
+- **WHEN** Shukra's `Born` (6.93 s) is chosen
+- **THEN** it plays once to its end before the next idle is chosen
+
+#### Scenario: Tap during an interlude
+- **WHEN** the stage is tapped while `Standchange` plays
+- **THEN** an action starts as after a tap in any idle
+
+### Requirement: A Fight clip in Display looks like the Menu idle
+A Fight clip played in Display, own or borrowed, SHALL show the meshes the shown skin's rule gives its Menu idle clip (`UiStand1`), not the
+Fight rule, so that no mesh appears or disappears when it crossfades with a Menu clip. A borrowed Fight clip SHALL hold the bones its
+source does not drive in the mean pose of the shown model's own Fight idle (`Stand1`), as it does in Playground's Fight list. A Fight clip
+SHALL NOT have a voice line or a caption.
+
+#### Scenario: No mesh swap
+- **WHEN** a skin whose Fight list hides a mesh that its Menu idle shows is the Display model (a synthetic manifest: Qu's models hide nothing) and `Stand1` follows `UiStand1`
+- **THEN** the same meshes are shown before, during and after the crossfade
+
+#### Scenario: Borrowed Fight clip
+- **WHEN** Pavo's `Win` plays on Shukra in Display
+- **THEN** it plays retargeted with no caption, and Shukra's helper and cloth bones hold the mean pose of her own `Stand1`
+
+### Requirement: A Fight clip carries over to Playground
+When Display is left for Playground while a Fight clip plays, Playground SHALL be in the Fight context with that clip selected and going on,
+and from then on SHALL apply the Fight rule for the meshes, as for any clip of its Fight list.
+
+#### Scenario: Leave during Stand2
+- **WHEN** the panel is switched to Playground while Shukra's `Stand2` plays in Display
+- **THEN** the player shows Fight with `Stand2` selected, and no Menu clip starts
+
+### Requirement: Idle candidates
+Display's idle SHALL be picked from the shown skin's own Fight idles (`Born`, `Stand1`, `Stand2`, `Standchange`, `Save`, `Win` and the `LevelAttack…`
+clips its Fight list has, except those the user turned off; all on by default), its own Menu idles (`UiStand1`, `StandAct0101`, always) and the same
+clips of other frames the user chose (by default both Menu idles of each frame in `lobby.idleFrom`, no Fight clip), borrowed as in Playground.
+`Run`, `Walk`, attacks and reactions are not candidates.
+
+#### Scenario: Own Fight clips
+- **WHEN** Shukra and then Pavo are the Display model with no choice saved
+- **THEN** the own Fight candidates are Shukra's six (`Born`, `Stand1`, `Stand2`, `Standchange`, `Save`, `Win`) and Pavo's seven (those and `LevelAttack14`)
+
+#### Scenario: Level skill on another frame
+- **WHEN** Pavo's `LevelAttack14` is chosen for Shukra and comes up as an idle
+- **THEN** it plays on Shukra's body, retargeted, once, with no caption
+
+### Requirement: Idle shares
+The own Fight, own Menu and borrowed groups SHALL take 60 %, 30 % and 10 % of the picks, renormalized over the groups that are not empty. Within
+own Fight every clip SHALL weigh the same; within own Menu `UiStand1` SHALL weigh 3 and `StandAct0101` 2; the borrowed share SHALL be split evenly
+over the lending frames, and within one lender its Fight clips and its Menu idles SHALL keep the ratio 60 : 30 when it lends both. Repeats are allowed.
+
+#### Scenario: Shares on Shukra's default
+- **WHEN** 1000 idles are chosen on Shukra with the default choice
+- **THEN** 55 % to 65 % of them are Shukra's six Fight clips, 25 % to 35 % its own `UiStand1` and `StandAct0101`, and 7 % to 13 % Pavo's two Menu idles
+
+#### Scenario: Nothing borrowed
+- **WHEN** the user has cleared Pavo's section for Shukra and 600 idles are chosen with otherwise the default choice
+- **THEN** 61 % to 72 % of them are Shukra's six Fight clips and the rest its own `UiStand1` and `StandAct0101`
+
+#### Scenario: Own Fight turned off
+- **WHEN** the user turned off all of Shukra's own Fight clips and 1000 idles are chosen on Shukra with otherwise the default choice
+- **THEN** 70 % to 80 % of them are Shukra's own Menu idles and the rest Pavo's
+
+### Requirement: An idle plays whole loops
+A chosen clip that loops SHALL play whole loops for at least 10 s (the smallest number of loops that reaches 10 s, to within 0.05 s), and the next
+idle SHALL be chosen at the end of its last loop; a different one crossfades in over 0.25 s, the same one just goes on looping. A clip that does not
+loop plays once (see "A clip that does not loop plays once").
+
+#### Scenario: Dwell
+- **WHEN** Pavo's `UiStand1` (6.0 s) is chosen
+- **THEN** it plays twice (12 s) before the next choice
+
+#### Scenario: Long idle
+- **WHEN** Shukra's `UiStand1` (17.0 s) is chosen
+- **THEN** it plays once before the next choice
+
+#### Scenario: Short idle
+- **WHEN** Shukra's `StandAct0101` (3.33 s) is chosen
+- **THEN** it plays three times before the next choice
+
+#### Scenario: Short Fight idle
+- **WHEN** Shukra's `Save` (2.0 s) is chosen
+- **THEN** it plays five times before the next choice
+
+#### Scenario: Another idle
+- **WHEN** an idle ends its last loop and another idle is chosen (`Stand1` after `UiStand1`, or Pavo's after Shukra's own)
+- **THEN** it crossfades in from the start, with no frame in bind pose
+
+#### Scenario: Same idle again
+- **WHEN** the same looping idle is chosen again
+- **THEN** it keeps looping with no restart
+
+### Requirement: Leaving Display stops the director
+Leaving Display SHALL stop the director: no timer runs, no action starts by itself in Playground, and the prepared line is released. The
+clip that was playing carries over to Playground as the selected clip.
+
+#### Scenario: Playground after an action
+- **WHEN** the panel is switched to Playground while an action plays
+- **THEN** the action goes on and is the selected clip in the player, and no new action starts when it ends
