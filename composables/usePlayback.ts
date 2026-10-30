@@ -40,6 +40,12 @@ interface Preparing {
   promise: Promise<void>
 }
 
+/** An item of either list, with the list it is in. */
+export interface LobbyItem {
+  item: CatalogItem
+  context: ContextId
+}
+
 /** The shown model's own idle clip, or the idle of the frame a lent action comes from: what a voiced timeline falls back on. */
 interface IdleRequest {
   key: string
@@ -94,16 +100,40 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
   /** The shown model can play something: it has a clip set of its own, or at least one other frame lends it clips. */
   const canPlay = (s: ViewerSession | null): s is ViewerSession => s !== null && (s.manifest !== null || lent.value.some((l) => l.frame !== s.construct.id))
 
-  const catalog = computed<Catalog | null>(() => {
+  /** The shown skin's list for a context: its own clips and the other frames' (`withSources`). */
+  function catalogOf(ctx: ContextId): Catalog | null {
     const current = session.value
     if (!current) return null
     const frame = current.construct.id
     const others = lent.value.filter((s) => s.frame !== frame)
     // A frame with no clip set of its own (Erza) has no own groups: its list is the sources' groups only.
-    if (!current.manifest) return withSources(null, others, context.value)
-    return withSources(buildCatalog(current.manifest, context.value), others, context.value, lent.value.find((s) => s.frame === frame))
-  })
+    if (!current.manifest) return withSources(null, others, ctx)
+    return withSources(buildCatalog(current.manifest, ctx), others, ctx, lent.value.find((s) => s.frame === frame))
+  }
+  const catalog = computed<Catalog | null>(() => catalogOf(context.value))
   const items = computed(() => new Map((catalog.value?.groups ?? []).flatMap((g) => g.items).map((i) => [i.id, i])))
+  /**
+   * The items of both lists, Menu and Fight, tagged with the list they come from, whatever the current context is: what Display chooses
+   * from (its idles are Menu and Fight clips). Ids do not collide (a clip index belongs to one clip, and the lists hold different clips).
+   */
+  const lobbyItems = computed(() => {
+    const map = new Map<string, LobbyItem>()
+    for (const ctx of ['menu', 'fight'] as const) {
+      let list: Catalog | null = null
+      try {
+        list = catalogOf(ctx)
+      } catch (err) {
+        console.warn(`Display cannot list the ${ctx} clips (${err instanceof Error ? err.message : String(err)})`)
+      }
+      for (const group of list?.groups ?? []) for (const item of group.items) map.set(item.id, { item, context: ctx })
+    }
+    return map
+  })
+  /** An item of the current list, else one of the other list (Display's Fight clips while the context is Menu), with the list it is in. */
+  function find(id: Selection): LobbyItem | null {
+    const here = items.value.get(id)
+    return here ? { item: here, context: context.value } : (lobbyItems.value.get(id) ?? null)
+  }
   /** Voice pairing of the frame an item comes from. */
   const voicesOf = (item: CatalogItem): Voices | undefined => voicesByFrame.value.get(item.source?.frame ?? session.value?.construct.id ?? '')
   /** Items in the current list that play with a voice line (Menu only). */
@@ -112,6 +142,15 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
     if (context.value !== 'menu') return set
     for (const item of items.value.values()) {
       const v = voicesOf(item)
+      if (v && voiceFor(v, item.name)) set.add(item.id)
+    }
+    return set
+  })
+  /** Menu items that play with a voice line, whatever the current context is (Display's pool is read from the Menu list). */
+  const lobbyVoiced = computed(() => {
+    const set = new Set<string>()
+    for (const { item, context: ctx } of lobbyItems.value.values()) {
+      const v = ctx === 'menu' ? voicesOf(item) : undefined
       if (v && voiceFor(v, item.name)) set.add(item.id)
     }
     return set
@@ -234,7 +273,7 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
   function itemInfo(id: Selection): { name: string; frame: string; duration: number; loop: boolean } | null {
     const current = session.value
     if (!current) return null
-    const item = items.value.get(id)
+    const item = find(id)?.item
     if (!item) return null
     const entry = item.source ? sourceManifestOf(item)?.clips[item.clip] : current.manifest?.clips[item.clip]
     if (!entry) return null
@@ -243,7 +282,7 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
 
   /** The wiki title of the voice line that plays with an item (its own frame's: "General Greeting 12"), or null when it has none. */
   function lineTitle(id: Selection): string | null {
-    const item = items.value.get(id)
+    const item = find(id)?.item
     const voices = item ? voicesOf(item) : undefined
     return (item && voices ? voiceFor(voices, item.name)?.title : undefined) ?? null
   }
@@ -264,9 +303,9 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
     return current.manifest ? hiddenNodesFor(current.manifest, ctx, clipName) : []
   }
 
-  /** The voice line of a Board action in the Menu context (its own frame's), or null. */
-  function lineOf(current: ViewerSession, item: CatalogItem, name: string): { url: string; text: string | undefined } | null {
-    const voices = context.value === 'menu' ? voicesOf(item) : undefined
+  /** The voice line of a Board action in the Menu list (its own frame's), or null; a Fight clip has none. */
+  function lineOf(current: ViewerSession, item: CatalogItem, name: string, ctx: ContextId): { url: string; text: string | undefined } | null {
+    const voices = ctx === 'menu' ? voicesOf(item) : undefined
     const line = voices ? voiceFor(voices, name) : undefined
     if (!voices || !line) return null
     const origin = item.source?.frame ?? current.construct.id
@@ -288,13 +327,13 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
     }
     const lender = lent.value.find((s) => s.frame === item.source?.frame)
     if (!lender) return null
-    const idleItem = items.value.get(`${lender.frame}:${lender.manifestPath}#${lender.manifest.contexts.menu.idle.clip}`)
-    const req = idleItem ? request(current, idleItem) : null
+    const idleItem = lobbyItems.value.get(`${lender.frame}:${lender.manifestPath}#${lender.manifest.contexts.menu.idle.clip}`)?.item
+    const req = idleItem ? request(current, idleItem, 'menu') : null
     return idleItem && req ? { key: req.key, entry: req.entry, rootNode: rootNodeOf(current, idleItem, req), load: req.load } : null
   }
 
   /** How to play `item` on the shown model: its own clip, or another frame's clip retargeted (the key names the frame and the skin). */
-  function request(current: ViewerSession, item: CatalogItem): PlayRequest | null {
+  function request(current: ViewerSession, item: CatalogItem, ctx: ContextId): PlayRequest | null {
     const { viewer, manifest, manifestPath, construct, skin } = current
     if (!item.source) {
       const entry = manifest?.clips[item.clip]
@@ -309,11 +348,11 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
     const sourceManifest = sourceManifestOf(item)
     const entry = sourceManifest?.clips[item.clip]
     if (!entry) return null
-    // The fill pose depends on the shown skin and the context, so the key names both.
-    const key = `${frame}/${sourcePath}#${item.clip}@${construct.id}/${skin.id}/${context.value}`
+    // The fill pose depends on the shown skin and the list the clip is in, so the key names both.
+    const key = `${frame}/${sourcePath}#${item.clip}@${construct.id}/${skin.id}/${ctx}`
     const url = assetUrl(frame, resolveClipPath(sourcePath, entry.file))
     // The fill pose is the shown model's own idle clip; a model with no clip set of its own has none, so what the sources do not drive keeps its bind pose.
-    const idleEntry = manifest?.clips[context.value === 'menu' ? manifest.contexts.menu.idle.clip : resolveFightIdle(manifest)]
+    const idleEntry = manifest?.clips[ctx === 'menu' ? manifest.contexts.menu.idle.clip : resolveFightIdle(manifest)]
     const idleUrl = idleEntry && manifestPath ? assetUrl(construct.id, resolveClipPath(manifestPath, idleEntry.file)) : null
     return {
       id: item.id,
@@ -334,8 +373,13 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
     }
   }
 
-  /** `loop` overrides the loop choice for this clip (the lobby director's idles loop and its actions end, whatever the user chose). */
-  async function select(choice: Selection, play: { loop?: boolean } = {}): Promise<SelectResult> {
+  /**
+   * `loop` overrides the loop choice for this clip (the lobby director's idles loop and its actions end, whatever the user chose).
+   * `look: 'menuIdle'` shows the meshes the shown skin's rule gives its Menu idle instead of the rule of the list the clip is in (Display
+   * plays Fight clips that way, so no mesh appears or goes at a crossfade with a Menu clip). An item of the other list than the current
+   * one can be selected (Display's Fight clips); it plays with the rules of its own list.
+   */
+  async function select(choice: Selection, play: { loop?: boolean; look?: 'menuIdle' } = {}): Promise<SelectResult> {
     const current = session.value
     if (!canPlay(current)) return { status: 'failed' }
     const { viewer } = current
@@ -349,16 +393,17 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
       return { status: 'started' }
     }
 
-    const item = items.value.get(choice)
-    const req = item ? request(current, item) : null
-    if (!item || !req) return { status: 'failed' }
+    const found = find(choice)
+    const item = found?.item
+    const req = found ? request(current, found.item, found.context) : null
+    if (!found || !item || !req) return { status: 'failed' }
     const options: PlayClipOptions = {
       rootNode: rootNodeOf(current, item, req),
       loop: play.loop ?? loopChoice ?? req.entry.loop,
-      // Visibility follows the shown skin's rule for a clip of that name (Board action names are shared by every frame).
-      hiddenNodes: hiddenFor(current, context.value, req.entry.name),
+      // Visibility follows the shown skin's rule for a clip of that name (Board action names are shared by every frame), or its Menu idle's.
+      hiddenNodes: play.look === 'menuIdle' && current.manifest ? hiddenFor(current, 'menu', current.manifest.clips[current.manifest.contexts.menu.idle.clip]!.name) : hiddenFor(current, found.context, req.entry.name),
     }
-    const line = lineOf(current, item, req.entry.name)
+    const line = lineOf(current, item, req.entry.name, found.context)
     if (line) return playVoiced(current, item, { ...req, line }, options)
 
     const controller = new AbortController()
@@ -470,7 +515,7 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
     if (prepared?.id === id) return Promise.resolve()
     if (preparing?.id === id) return preparing.promise
     const item = items.value.get(id)
-    const req = item ? request(current, item) : null
+    const req = item ? request(current, item, 'menu') : null
     if (!item || !req) return Promise.resolve()
     releasePrepared()
     const { viewer } = current
@@ -480,7 +525,7 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
     job.promise = (async () => {
       let line: VoiceLine | null = null // released unless the slot takes it
       try {
-        const voiced = lineOf(current, item, req.entry.name)
+        const voiced = lineOf(current, item, req.entry.name, 'menu')
         const idle = voiced ? idleOf(current, item) : null
         const rootNode = rootNodeOf(current, item, req)
         const [clip, idleClip, loaded] = await Promise.all([
@@ -529,6 +574,21 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
     if (context.value === 'menu') return
     context.value = 'menu'
     selected.value = null
+  }
+
+  /**
+   * Leaving Display while one of its Fight clips plays (the context is Menu then): make that clip's list the context, so the player
+   * shows it selected, and let that list's rule decide its meshes from now on. Does nothing for a clip of the current list.
+   */
+  function adoptSelectionContext(): void {
+    const current = session.value
+    const id = selected.value
+    if (!canPlay(current) || id === null || id === BIND) return
+    const found = lobbyItems.value.get(id)
+    if (!found || found.context === context.value) return
+    context.value = found.context
+    current.viewer.setHiddenNodes(hiddenFor(current, found.context, found.item.name))
+    remembered = { context: found.context, clip: { frame: found.item.source?.frame ?? current.construct.id, name: found.item.name, label: found.item.label } }
   }
 
   function togglePlay(): void {
@@ -639,6 +699,8 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
     context,
     catalog,
     voiced,
+    lobbyItems,
+    lobbyVoiced,
     subtitle,
     selected,
     pending,
@@ -655,6 +717,7 @@ export function usePlayback(session: Ref<ViewerSession | null>, options: { takeO
     select,
     setContext,
     useMenuContext,
+    adoptSelectionContext,
     itemInfo,
     lineTitle,
     prepare,

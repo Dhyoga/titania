@@ -200,6 +200,8 @@ watch(mode, (next) => {
   openPopover.value = null
   if (session.value) shownMode = next // nothing loads (the model is the same): the camera is reset by `useCameraPreference`
   returning = next === 'display'
+  // A Fight clip that Display was idling on carries over to Playground in the Fight context, selected and going on.
+  if (next === 'playground') playback.adoptSelectionContext()
 })
 
 const lobby = useLobbyDirector({
@@ -209,7 +211,6 @@ const lobby = useLobbyDirector({
   container,
   // A press that closes a popover, unpins the menu or happens while adjusting the camera is not a tap.
   engaged: () => openPopover.value !== null || (stageMenu.value?.isPinned() ?? false) || adjusting.value,
-  adjusting: () => adjusting.value,
   entry: () => {
     const entry = returning ? 'idle' : 'action'
     returning = false
@@ -423,10 +424,13 @@ useViewerKeys({
               :display-frame="lobbyPool.frame"
               :candidates="lobbyPool.pool.candidates"
               :chosen="lobbyPool.chosen"
+              :own-off="lobbyPool.ownOff"
               :saved="lobbyPool.saved"
               :save-error="preferences.saveError.value"
               @toggle="lobby.toggle"
+              @toggle-own="lobby.toggleOwn"
               @set-frame="lobby.setFrame"
+              @set-own-fight="lobby.setOwnFight"
               @use-default="lobby.useDefault"
             />
           </Popover>

@@ -49,6 +49,12 @@ export interface LobbyPrefs {
    * nothing borrowed. Which keys name a clip that exists is decided against the shown model (`resolvePool`), not here.
    */
   pools: Record<string, string[]>
+  /**
+   * The Display frame's own Fight clips the user turned off (by frame id), as `<frame id>:<clip name>` with that same frame id. Own Fight
+   * clips are on by default, so a frame with no entry (or an empty list) plays all of its own; this is a list of what is off, kept apart
+   * from `pools` so that a choice saved before Fight idles existed keeps its meaning (`add-lobby-fight-idles`).
+   */
+  ownOff: Record<string, string[]>
 }
 
 export interface Prefs {
@@ -78,7 +84,7 @@ export function defaultPrefs(): Prefs {
 }
 
 export function defaultLobby(): LobbyPrefs {
-  return { frame: null, skin: null, camera: null, pools: {} }
+  return { frame: null, skin: null, camera: null, pools: {}, ownOff: {} }
 }
 
 /** Why an imported file was refused. */
@@ -159,24 +165,27 @@ function readSkins(raw: unknown, strict: boolean): Record<string, SkinPrefs> {
 /** The key of a chosen animation: `<frame id>:<clip name>`, short. */
 const checkPoolKey: Check<string> = (v) => (typeof v === 'string' && v.length <= 64 && /^[^:]+:.+$/.test(v) ? v : undefined)
 
-/** The chosen animations of each Display frame. Entries that are not a list, and keys that are not `<frame>:<name>`, are dropped (or throw when strict). */
-function readPools(raw: unknown, strict: boolean): Record<string, string[]> {
+/**
+ * The animation keys listed for each Display frame (`path` is `lobby.pools` or `lobby.ownOff`, for the messages). Entries that are not a
+ * list, and keys that are not `<frame>:<name>`, are dropped (or throw when strict).
+ */
+function readKeyLists(raw: unknown, strict: boolean, path: string): Record<string, string[]> {
   const pools: Record<string, string[]> = {}
   if (!isRecord(raw)) {
-    if (strict) throw new PrefsError('"lobby.pools" is not valid')
+    if (strict) throw new PrefsError(`"${path}" is not valid`)
     return pools
   }
   for (const [frame, entry] of Object.entries(raw)) {
     if (!isSafeKey(frame)) continue
     if (checkId(frame) === undefined || !Array.isArray(entry)) {
-      if (strict) throw new PrefsError(`"lobby.pools.${frame}" is not valid`)
+      if (strict) throw new PrefsError(`"${path}.${frame}" is not valid`)
       continue
     }
     const keys: string[] = []
     for (const key of entry) {
       const checked = checkPoolKey(key)
       if (checked === undefined) {
-        if (strict) throw new PrefsError(`"lobby.pools.${frame}" holds a value that is not <frame>:<clip>`)
+        if (strict) throw new PrefsError(`"${path}.${frame}" holds a value that is not <frame>:<clip>`)
         continue
       }
       if (!keys.includes(checked)) keys.push(checked)
@@ -200,7 +209,8 @@ function readLobby(raw: unknown, strict: boolean): LobbyPrefs {
   lobby.frame = field(raw, 'frame', checkId, lobby.frame, strict, 'lobby.frame')
   lobby.skin = field(raw, 'skin', checkId, lobby.skin, strict, 'lobby.skin')
   lobby.camera = field(raw, 'camera', checkCamera, lobby.camera, strict, 'lobby.camera')
-  if ('pools' in raw) lobby.pools = readPools(raw.pools, strict)
+  if ('pools' in raw) lobby.pools = readKeyLists(raw.pools, strict, 'lobby.pools')
+  if ('ownOff' in raw) lobby.ownOff = readKeyLists(raw.ownOff, strict, 'lobby.ownOff')
   return lobby
 }
 
@@ -246,19 +256,34 @@ export function importPrefs(text: string): Prefs {
 /** The text to store or export: exactly the record's fields, nothing else. */
 export function serializePrefs(prefs: Prefs): string {
   const { display, camera, lobby, skins } = prefs
-  return JSON.stringify({ version: PREFS_VERSION, display: { ...display }, camera, lobby: { ...lobby, pools: copyPools(lobby.pools) }, skins }, null, 2)
+  return JSON.stringify({ version: PREFS_VERSION, display: { ...display }, camera, lobby: { ...lobby, pools: copyPools(lobby.pools), ownOff: copyPools(lobby.ownOff) }, skins }, null, 2)
 }
 
 const copyPools = (pools: Readonly<Record<string, readonly string[]>>): Record<string, string[]> =>
   Object.fromEntries(Object.entries(pools).map(([frame, keys]) => [frame, [...keys]]))
 
-/** The record with one Display frame's chosen animations replaced; null forgets them (the frame's default applies again). */
+/**
+ * The record with one Display frame's chosen borrowed animations replaced; null forgets the frame's whole choice (the borrowed ones and the
+ * own Fight clips turned off: its default applies again).
+ */
 export function withPool(prefs: Prefs, frame: string, keys: readonly string[] | null): Prefs {
   if (!isSafeKey(frame)) return prefs
   const pools = copyPools(prefs.lobby.pools)
-  if (keys === null) delete pools[frame]
-  else pools[frame] = [...new Set(keys)]
-  return { ...prefs, lobby: { ...prefs.lobby, pools } }
+  const ownOff = copyPools(prefs.lobby.ownOff)
+  if (keys === null) {
+    delete pools[frame]
+    delete ownOff[frame]
+  } else pools[frame] = [...new Set(keys)]
+  return { ...prefs, lobby: { ...prefs.lobby, pools, ownOff } }
+}
+
+/** The record with one Display frame's own Fight clips that are off replaced; none (or no keys) removes the frame's entry. */
+export function withOwnOff(prefs: Prefs, frame: string, keys: readonly string[] | null): Prefs {
+  if (!isSafeKey(frame)) return prefs
+  const ownOff = copyPools(prefs.lobby.ownOff)
+  if (keys === null || keys.length === 0) delete ownOff[frame]
+  else ownOff[frame] = [...new Set(keys)]
+  return { ...prefs, lobby: { ...prefs.lobby, ownOff } }
 }
 
 /** The record with one skin's saved parts replaced; none (or no entries) removes the skin. Other skins are untouched. */

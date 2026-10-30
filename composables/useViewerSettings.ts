@@ -75,10 +75,14 @@ export function useViewerSettings(session: Ref<ViewerSession | null>, mode: Ref<
     { immediate: true },
   )
 
+  // Display always follows (its bust framing leaves the low poses of the Fight idles, `LevelAttack013Loop` and `14`, out of the frame
+  // otherwise); the setting is Playground's. Watching the effective value, not the mode, so that a switch that changes nothing does not
+  // pick the followed part again.
+  const effectiveFollow = computed(() => mode.value === 'display' || follow.value)
   // Its own watcher: setting follow picks the followed part again, which other settings (a lighting slider) must not do.
   watch(
-    [session, follow],
-    () => session.value?.viewer.setFollow(follow.value),
+    [session, effectiveFollow],
+    () => session.value?.viewer.setFollow(effectiveFollow.value),
     { immediate: true },
   )
 

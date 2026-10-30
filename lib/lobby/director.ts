@@ -4,33 +4,52 @@
 // into events and the commands into playback calls. The random source and the clock (`now`, in milliseconds, any origin) are injected,
 // so the tests use a seeded generator and plain numbers.
 //
-// Phases:  stopped → idle ⇄ action,  idle → asleep → action.
+// Phases:  stopped → idle ⇄ action. Display never pauses on its own: the idles go on until a tap or until the director stops.
 // The phase changes when a command is issued, not when the viewer reports the new clip. The viewer's state events are about whatever
 // clip is current, so an event about a clip other than the one last started (the end of an action a tap has just replaced, a wrap of
 // the idle that is being replaced) is stale and is ignored.
 
 /** Whole seconds an idle plays at least before the next pick. */
 export const LOBBY_DWELL_S = 10
-/** Without input for this long, Display falls asleep at the next idle wrap. */
-export const LOBBY_SLEEP_AFTER_MS = 120_000
 /** Taps closer than this to the last accepted one are ignored. */
 export const LOBBY_TAP_DEBOUNCE_MS = 400
 /** A dwell may fall this short of `LOBBY_DWELL_S` (a 3.33 s clip plays three times, not four). */
 const DWELL_TOLERANCE_S = 0.05
 
 /**
- * The idle clips Display stands in, with their weights within a source (own or lender). `StandAct0101` is left out on purpose: a nearly
- * still pose, dropped for every frame, own and borrowed (`add-lobby-variety`); add a name here to bring an idle back.
+ * The idle clips Display stands in, with their weights within a source (own or lender); a name here is also what makes a clip an idle
+ * candidate of the Animations popover. `StandAct0101` was dropped by `add-lobby-variety` and is back since `restore-standact-idle`.
  */
-export const LOBBY_IDLE_WEIGHTS: Readonly<Record<string, number>> = { UiStand1: 1 }
-/** The share of idle picks that go to borrowed idles (split evenly over the lenders), when the frame borrows any. */
-export const LOBBY_LENT_IDLE_SHARE = 0.25
+export const LOBBY_IDLE_WEIGHTS: Readonly<Record<string, number>> = { UiStand1: 3, StandAct0101: 2 }
+/**
+ * The Fight clips Display may idle on (`add-lobby-fight-idles`); a name here is what makes a Fight clip a candidate of the Animations
+ * popover. `Born` (the entrance, plays once) is one; `Run` and `Walk` are not idles. Of the `LevelAttack…` clips only Pavo has `LevelAttack14` (Shukra borrows it).
+ */
+export const LOBBY_FIGHT_IDLES: readonly string[] = [
+  'Born',
+  'Stand1',
+  'Stand2',
+  'Standchange',
+  'Save',
+  'Win',
+  'LevelAttack08_NunWalk',
+  'LevelAttack11_Loop',
+  'LevelAttack013Loop',
+  'LevelAttack14',
+]
+/**
+ * The shares of idle picks: the shown frame's own Fight clips, its own Menu idles, and everything borrowed (Menu and Fight of other
+ * frames, split evenly over the lenders). A group with nothing in it gives its share to the others in proportion.
+ */
+export const LOBBY_GROUP_SHARES = { ownFight: 0.6, ownMenu: 0.3, borrowed: 0.1 } as const
 
 export interface IdleChoice {
   id: string
   weight: number
   /** Seconds. */
   duration: number
+  /** The clip does not loop (`Win`, `Standchange` …): it plays once and the next idle is picked at its end. */
+  once?: boolean
 }
 
 export interface DirectorConfig {
@@ -38,7 +57,6 @@ export interface DirectorConfig {
   actions: readonly string[]
   idles: readonly IdleChoice[]
   dwellS?: number
-  sleepAfterMs?: number
   tapDebounceMs?: number
 }
 
@@ -46,11 +64,13 @@ export type DirectorEvent =
   | { type: 'start'; entry: 'action' | 'idle' }
   /** An accepted tap, or `Space`/`Enter` on the stage. */
   | { type: 'tap' }
-  /** Any other input: it only resets the sleep time. */
-  | { type: 'input' }
   | { type: 'actionEnded'; id: string }
   | { type: 'idleLoop'; id: string; loops: number }
+  /** A clip that does not loop (`IdleChoice.once`) reached its end: the next idle is picked. */
+  | { type: 'idleEnded'; id: string }
   | { type: 'actionFailed'; id: string }
+  /** The idle that was just started could not be played: it leaves the idles (until the next start) and another is picked. */
+  | { type: 'idleFailed'; id: string }
   /**
    * The pool and the idles changed (the user's choice): see `createDirector`. Valid in any phase; the clip that plays is never
    * interrupted, and an action that failed since the last start stays out.
@@ -63,10 +83,8 @@ export type DirectorCommand =
   | { type: 'playIdle'; id: string }
   /** Get this action ready (clip built, line decoded); asking again for the id already prepared does nothing. */
   | { type: 'prepare'; id: string }
-  | { type: 'sleep' }
-  | { type: 'wake' }
 
-export type DirectorPhase = 'stopped' | 'idle' | 'action' | 'asleep'
+export type DirectorPhase = 'stopped' | 'idle' | 'action'
 
 export interface DirectorState {
   phase: DirectorPhase
@@ -114,7 +132,6 @@ export function pickWeighted(weights: readonly number[], random: () => number): 
 
 export function createDirector(config: DirectorConfig, random: () => number): Director {
   const dwellS = config.dwellS ?? LOBBY_DWELL_S
-  const sleepAfterMs = config.sleepAfterMs ?? LOBBY_SLEEP_AFTER_MS
   const tapDebounceMs = config.tapDebounceMs ?? LOBBY_TAP_DEBOUNCE_MS
 
   let phase: DirectorPhase = 'stopped'
@@ -123,15 +140,23 @@ export function createDirector(config: DirectorConfig, random: () => number): Di
   let pool: string[] = [...wanted]
   /** Actions that failed since the last start: `setPool` does not bring them back. */
   const failed = new Set<string>()
+  /** Idles that failed since the last start: `setPool` does not bring them back. */
+  const failedIdles = new Set<string>()
   let bag: string[] = []
   let lastTaken: string | null = null
   let current: string | null = null
   let startedBy: 'open' | 'tap' | null = null
   let idleLoopsWanted = 0
-  let lastInput = 0
+  /** The idle that plays does not loop: it ends by itself instead of wrapping. */
+  let currentOnce = false
   let lastTapAt: number | null = null
 
   let idles = config.idles.filter((i) => i.weight > 0)
+  /** The idle that is picked next, by weight, among those that have not failed since the last start. */
+  function pickIdle(): IdleChoice | undefined {
+    const live = idles.filter((i) => !failedIdles.has(i.id))
+    return live[pickWeighted(live.map((i) => i.weight), random)]
+  }
 
   /** The bag is refilled when it runs out; a new bag never starts with the action that was just taken. */
   function ensureBag(): void {
@@ -161,23 +186,30 @@ export function createDirector(config: DirectorConfig, random: () => number): Di
     phase = 'action'
     current = id
     startedBy = by
+    currentOnce = false
     idleLoopsWanted = 0
     return [{ type: 'playAction', id }, ...prepareNext()]
+  }
+
+  /** Start `pick` as the idle that plays: a looping one for whole loops up to the dwell, a clip that does not loop once. */
+  function enterIdle(pick: IdleChoice): DirectorCommand[] {
+    current = pick.id
+    currentOnce = pick.once === true
+    idleLoopsWanted = currentOnce ? 0 : loopsFor(pick.duration, dwellS)
+    return [{ type: 'playIdle', id: pick.id }, ...prepareNext()]
   }
 
   function startIdle(): DirectorCommand[] {
     phase = 'idle'
     startedBy = null
-    const at = pickWeighted(idles.map((i) => i.weight), random)
-    const pick = idles[at]
+    const pick = pickIdle()
     if (!pick) {
       current = null
+      currentOnce = false
       idleLoopsWanted = 0
       return []
     }
-    current = pick.id
-    idleLoopsWanted = loopsFor(pick.duration, dwellS)
-    return [{ type: 'playIdle', id: pick.id }, ...prepareNext()]
+    return enterIdle(pick)
   }
 
   function dropFromPool(id: string): void {
@@ -207,7 +239,6 @@ export function createDirector(config: DirectorConfig, random: () => number): Di
     // Removals may have left the action just taken at the head.
     if (bag.length > 1 && bag[0] === lastTaken) [bag[0], bag[1]] = [bag[1]!, bag[0]!]
     else if (bag.length === 1 && bag[0] === lastTaken && pool.length > 1) bag = []
-    if (phase === 'asleep') return []
     const next = peekAction()
     return next !== null && next !== headBefore ? [{ type: 'prepare', id: next }] : []
   }
@@ -217,31 +248,18 @@ export function createDirector(config: DirectorConfig, random: () => number): Di
     if (event.type === 'start') {
       pool = [...wanted]
       failed.clear()
+      failedIdles.clear()
       bag = []
       lastTaken = null
       lastTapAt = null
-      lastInput = now
       return event.entry === 'action' ? startAction('open') : startIdle()
     }
     if (phase === 'stopped') return []
 
     switch (event.type) {
-      case 'input':
-        lastInput = now
-        return []
-
       case 'tap': {
-        lastInput = now
         if (lastTapAt !== null && now - lastTapAt < tapDebounceMs) return []
         lastTapAt = now
-        if (phase === 'asleep') {
-          // The pose resumes first; with nothing to perform the model just goes on idling.
-          if (pool.length === 0) {
-            phase = 'idle'
-            return [{ type: 'wake' }]
-          }
-          return [{ type: 'wake' }, ...startAction('tap')]
-        }
         if (pool.length === 0) return []
         return startAction('tap')
       }
@@ -251,23 +269,31 @@ export function createDirector(config: DirectorConfig, random: () => number): Di
         return startIdle()
 
       case 'idleLoop': {
-        if (phase !== 'idle' || event.id !== current) return []
-        // A wrap is where a looping clip is back at its first pose: the place to freeze it, or to crossfade to the next idle.
-        if (now - lastInput >= sleepAfterMs) {
-          phase = 'asleep'
-          return [{ type: 'sleep' }]
-        }
+        if (phase !== 'idle' || event.id !== current || currentOnce) return []
+        // A wrap is where a looping clip is back at its first pose: the place to crossfade to the next idle.
         if (event.loops < idleLoopsWanted) return []
-        const at = pickWeighted(idles.map((i) => i.weight), random)
-        const pick = idles[at]
+        const pick = pickIdle()
         if (!pick) return []
         if (pick.id === current) {
           idleLoopsWanted = event.loops + loopsFor(pick.duration, dwellS) // the same idle goes on looping, no restart
           return []
         }
-        current = pick.id
-        idleLoopsWanted = loopsFor(pick.duration, dwellS)
-        return [{ type: 'playIdle', id: pick.id }, ...prepareNext()]
+        return enterIdle(pick)
+      }
+
+      case 'idleEnded': {
+        if (phase !== 'idle' || event.id !== current || !currentOnce) return []
+        const pick = pickIdle()
+        // The same clip again starts from its start (it does not loop, so there is nothing to carry on).
+        return pick ? enterIdle(pick) : []
+      }
+
+      case 'idleFailed': {
+        failedIdles.add(event.id)
+        if (phase !== 'idle' || event.id !== current) return []
+        // Nothing else to play: the previous clip goes on as it is, and the model waits for a tap.
+        const pick = pickIdle()
+        return pick ? enterIdle(pick) : []
       }
 
       case 'actionFailed': {
@@ -279,15 +305,14 @@ export function createDirector(config: DirectorConfig, random: () => number): Di
         return by === 'tap' && pool.length > 0 ? startAction('tap') : startIdle()
       }
 
-      case 'stop': {
-        const wasAsleep = phase === 'asleep'
+      case 'stop':
         phase = 'stopped'
         current = null
         startedBy = null
+        currentOnce = false
         bag = []
         idleLoopsWanted = 0
-        return wasAsleep ? [{ type: 'wake' }] : []
-      }
+        return []
     }
   }
 

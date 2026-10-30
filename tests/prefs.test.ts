@@ -9,6 +9,7 @@ import {
   PrefsError,
   savedSkinCount,
   serializePrefs,
+  withOwnOff,
   withPool,
   withSkinParts,
   type Prefs,
@@ -21,7 +22,7 @@ const sample = (): Prefs => ({
   version: 1,
   display: { backgroundMode: 'solid', solidColor: '#102030', grid: true, follow: false, toon: false, intensity: 1.5, azimuthDeg: -40 },
   camera,
-  lobby: { frame: 'pavo', skin: 'r2qumd010011', camera: { ...camera, zoom: 0.45 }, pools: { shukra: ['pavo:BoardAct0201', 'fourth:UiStand1'], third: [] } },
+  lobby: { frame: 'pavo', skin: 'r2qumd010011', camera: { ...camera, zoom: 0.45 }, pools: { shukra: ['pavo:BoardAct0201', 'fourth:UiStand1'], third: [] }, ownOff: { shukra: ['shukra:Win'] } },
   skins: { r3qumd010011: { parts: { R3QuMd010011Weapon: 'hide', Band: 'show' } } },
 })
 
@@ -30,7 +31,7 @@ test('the defaults are what the panel started with before preferences existed', 
     version: 1,
     display: { backgroundMode: 'gradient', solidColor: '#cfd8e6', grid: false, follow: true, toon: true, intensity: 1, azimuthDeg: 0 },
     camera: null,
-    lobby: { frame: null, skin: null, camera: null, pools: {} },
+    lobby: { frame: null, skin: null, camera: null, pools: {}, ownOff: {} },
     skins: {},
   })
   assert.equal(DEFAULT_DISPLAY.intensity, DEFAULT_LIGHTING.intensity)
@@ -184,8 +185,8 @@ test('a record or file from before Display mode reads the Display defaults and k
 test('each Display field falls back on its own', () => {
   const read = (lobby: unknown) => parsePrefs(JSON.stringify({ ...sample(), lobby })).lobby
   assert.deepEqual(read('shukra'), defaultLobby())
-  assert.deepEqual(read({ frame: 'third', skin: 7, camera: 'close' }), { frame: 'third', skin: null, camera: null, pools: {} })
-  assert.deepEqual(read({ frame: '', skin: 'r3qumd019011', camera }), { frame: null, skin: 'r3qumd019011', camera, pools: {} })
+  assert.deepEqual(read({ frame: 'third', skin: 7, camera: 'close' }), { frame: 'third', skin: null, camera: null, pools: {}, ownOff: {} })
+  assert.deepEqual(read({ frame: '', skin: 'r3qumd019011', camera }), { frame: null, skin: 'r3qumd019011', camera, pools: {}, ownOff: {} })
   assert.deepEqual(read({ frame: 'x'.repeat(65) }), defaultLobby())
   // The Display camera is independent of the Playground one.
   const p = parsePrefs(JSON.stringify({ ...sample(), camera: 'bad' }))
@@ -251,4 +252,50 @@ test('withPool sets, replaces and forgets one frame\'s choice and leaves the res
   assert.deepEqual(withPool(base, 'shukra', null).lobby.pools, { third: [] })
   assert.equal(withPool(base, '__proto__', ['a:b']), base)
   assert.deepEqual({ ...set.lobby, pools: {} }, { ...base.lobby, pools: {} })
+})
+
+// ---- the own Fight clips turned off (port-pgr-updates, from PGR's add-lobby-fight-idles) ----
+
+test('own Fight clips turned off read tolerantly and strictly like the animation choices, naming their own field', () => {
+  const read = (ownOff: unknown) => parsePrefs(JSON.stringify({ ...sample(), lobby: { ...sample().lobby, ownOff } })).lobby.ownOff
+  assert.deepEqual(read('all'), {})
+  assert.deepEqual(read({ shukra: 'x', third: ['third:Win', 'third:Win', 7, 'nocolon'] }), { third: ['third:Win'] })
+  assert.deepEqual(read({ fourth: [] }), { fourth: [] })
+  assert.deepEqual(Object.keys(read(JSON.parse('{"__proto__": ["a:b"]}'))), [])
+  // The borrowed choices are unaffected by a bad ownOff.
+  assert.deepEqual(parsePrefs(JSON.stringify({ ...sample(), lobby: { ...sample().lobby, ownOff: 3 } })).lobby.pools, sample().lobby.pools)
+  const imp = (ownOff: unknown) => () => importPrefs(JSON.stringify({ ...sample(), lobby: { ...sample().lobby, ownOff } }))
+  assert.throws(imp('all'), /lobby\.ownOff/)
+  assert.throws(imp({ shukra: 'shukra:Win' }), /lobby\.ownOff\.shukra/)
+  assert.throws(imp({ shukra: ['shukra:Win', 5] }), /lobby\.ownOff\.shukra/)
+  assert.doesNotThrow(imp({ shukra: ['shukra:Win'], third: [] }))
+})
+
+test('a record or file from before Fight idles has no own Fight clip off and keeps its borrowed choice', () => {
+  const { ownOff: _ownOff, ...lobby } = sample().lobby
+  const text = JSON.stringify({ ...sample(), lobby })
+  assert.deepEqual(parsePrefs(text).lobby.ownOff, {})
+  assert.deepEqual(importPrefs(text).lobby.ownOff, {})
+  assert.deepEqual(parsePrefs(text).lobby.pools, sample().lobby.pools)
+})
+
+test('own Fight clips turned off survive a round trip and an export, and go with forget all', () => {
+  const text = serializePrefs(sample())
+  assert.deepEqual(JSON.parse(text).lobby.ownOff, sample().lobby.ownOff)
+  assert.deepEqual(importPrefs(text).lobby.ownOff, sample().lobby.ownOff)
+  assert.deepEqual(defaultPrefs().lobby.ownOff, {})
+})
+
+test('withOwnOff sets and clears one frame\'s list, and forgetting a frame\'s choice clears both lists', () => {
+  const base = sample()
+  const set = withOwnOff(base, 'third', ['third:Save', 'third:Save'])
+  assert.deepEqual(set.lobby.ownOff, { shukra: ['shukra:Win'], third: ['third:Save'] })
+  assert.deepEqual(base.lobby.ownOff, { shukra: ['shukra:Win'] }, 'the input is not changed')
+  assert.equal('third' in withOwnOff(set, 'third', []).lobby.ownOff, false)
+  assert.equal('third' in withOwnOff(set, 'third', null).lobby.ownOff, false)
+  assert.equal(withOwnOff(base, '__proto__', ['a:b']), base)
+  const forgotten = withPool(base, 'shukra', null)
+  assert.deepEqual(forgotten.lobby.pools, { third: [] })
+  assert.deepEqual(forgotten.lobby.ownOff, {})
+  assert.deepEqual(withPool(base, 'shukra', ['fourth:Run']).lobby.ownOff, base.lobby.ownOff, 'saving borrowed keys leaves ownOff')
 })

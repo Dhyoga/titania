@@ -20,14 +20,15 @@ character framed from the crown to the upper thighs on a locked camera.
 - When it opens she performs a **Board action with its voice line**, then stands in her idle. **Tap the stage** (or press `Space` or
   `Enter`) and she performs another one, interrupting the first. The actions are the Board actions of the shown frame that have a voice
   line, plus those of the other frame by default (Shukra borrows Pavo's, Pavo borrows Shukra's), each with its own frame's voice line.
-- After 2 minutes without input she falls asleep (the pose pauses and nothing is rendered) until the next tap.
+- Between taps she idles on her own: her Menu idles and a set of Fight clips (stances, the win pose, the entrance), picked at random, for as long as the panel is open (no sleep).
 - Display always plays at normal speed.
 
 Its menu has five buttons:
 
 - **Model**: choose the frame and skin Display shows. It is saved as soon as you choose it.
-- **Animations**: choose which animations Display may play on this model. The frame's own are always played; the other frame's are
-  checked one by one or all at once, and saved per Display frame. **Use default** forgets the choice. A change applies while Display runs.
+- **Animations**: choose which animations Display may play on this model, in Menu sections and then Fight sections. The frame's own Menu animations are always
+  played; its own Fight clips start on and can be turned off; the other frame's (Menu and Fight) are checked one by one or all at once, and saved per Display frame. **Use default**
+  forgets the choice. A change applies while Display runs.
 - **Adjust camera**: unlocks the camera (drag, scroll or pinch), then **Save**, **Use built-in** or **Cancel** (`Esc`). The saved view is
   stored relative to the default framing, so it fits every frame, skin and panel size. It is separate from the Playground default camera.
 - **Mute**: the voice mute, the same as `M`.
@@ -127,6 +128,8 @@ Then open `chrome://extensions`, switch on **Developer mode**, choose **Load unp
 icon to open the side panel. After a rebuild, press the reload button on the extension's card.
 
 `pnpm dev` rebuilds into `dist/chrome-mv3-dev` while you work (load that folder instead; it does not open a browser).
+
+The toolbar icons (`public/icon/`) are a generated monogram, committed; `node scripts/make-icons.ts` makes them again (same bytes).
 
 ### The assets are symlinks
 

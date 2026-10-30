@@ -1,5 +1,5 @@
 import { ref, shallowRef } from 'vue'
-import { defaultPrefs, importPrefs, parsePrefs, PREFS_KEY, serializePrefs, withPool, type Prefs } from '~/lib/prefs/prefs'
+import { defaultPrefs, importPrefs, parsePrefs, PREFS_KEY, serializePrefs, withOwnOff, withPool, type Prefs } from '~/lib/prefs/prefs'
 
 /** How long a change waits before it is written, so a slider drag is one write. A Save button writes at once. */
 const WRITE_DELAY_MS = 300
@@ -55,9 +55,15 @@ function replace(next: Prefs): boolean {
   return flush()
 }
 
-/** A Display frame's chosen animations (null forgets them: its default applies), written at once. False when it could not be stored. */
+/** A Display frame's chosen borrowed animations (null forgets its whole choice, own Fight clips turned off included: its default applies), written at once. False when it could not be stored. */
 function setPool(frame: string, keys: readonly string[] | null): boolean {
   update((p) => withPool(p, frame, keys))
+  return flush()
+}
+
+/** A Display frame's own Fight clips that are turned off (none: all on), written at once. False when it could not be stored. */
+function setOwnOff(frame: string, keys: readonly string[] | null): boolean {
+  update((p) => withOwnOff(p, frame, keys))
   return flush()
 }
 
@@ -93,7 +99,7 @@ function listen(): void {
 /** The panel's preferences (see `lib/prefs/prefs.ts`): reactive, shared, saved to local storage, refreshed when another panel writes. */
 export function usePreferences() {
   listen()
-  return { prefs, saveError, update, flush, replace, setPool, forgetAll, exportText, importText }
+  return { prefs, saveError, update, flush, replace, setPool, setOwnOff, forgetAll, exportText, importText }
 }
 
 export type PreferencesApi = ReturnType<typeof usePreferences>

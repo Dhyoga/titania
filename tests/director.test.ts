@@ -5,6 +5,8 @@ import {
   loopsFor,
   pickWeighted,
   shuffled,
+  LOBBY_FIGHT_IDLES,
+  LOBBY_GROUP_SHARES,
   LOBBY_IDLE_WEIGHTS,
   type DirectorCommand,
   type DirectorConfig,
@@ -41,7 +43,7 @@ const prepared = (cs: DirectorCommand[]): string | null => {
 }
 
 test('the idles agreed for Display', () => {
-  assert.deepEqual({ ...LOBBY_IDLE_WEIGHTS }, { UiStand1: 1 }) // StandAct0101 is not a Display idle on any frame
+  assert.deepEqual({ ...LOBBY_IDLE_WEIGHTS }, { UiStand1: 3, StandAct0101: 2 }) // StandAct0101 is back (restore-standact-idle)
 })
 
 test('loopsFor: the smallest number of whole loops that reaches the dwell, within 0.05 s', () => {
@@ -216,46 +218,6 @@ test('idle weights over many picks are 3 : 2', () => {
   assert.ok(Math.abs(ui / n - 0.6) < 0.03, String(ui / n))
 })
 
-test('sleep: only at an idle wrap, only 120 s after the last input, and an input postpones it', () => {
-  const idles: IdleChoice[] = [{ id: 'i', weight: 1, duration: 6 }]
-  const d = createDirector(cfg({ actions: [], idles }), seeded(4))
-  d.handle({ type: 'start', entry: 'idle' }, 0)
-  assert.deepEqual(d.handle({ type: 'idleLoop', id: 'i', loops: 1 }, 119_999), [])
-  assert.equal(d.state().phase, 'idle')
-  // an input at 110 s moves the deadline to 230 s
-  d.handle({ type: 'input' }, 110_000)
-  assert.deepEqual(d.handle({ type: 'idleLoop', id: 'i', loops: 3 }, 125_000), [])
-  assert.deepEqual(d.handle({ type: 'idleLoop', id: 'i', loops: 5 }, 229_999), [])
-  assert.deepEqual(d.handle({ type: 'idleLoop', id: 'i', loops: 6 }, 230_000), [{ type: 'sleep' }])
-  assert.equal(d.state().phase, 'asleep')
-})
-
-test('sleep never comes during an action, and an action that ended late sleeps at the first idle wrap', () => {
-  const idles: IdleChoice[] = [{ id: 'i', weight: 1, duration: 6 }]
-  const d = createDirector(cfg({ idles }), seeded(8))
-  const open = d.handle({ type: 'start', entry: 'action' }, 0)
-  const id = played(open)!
-  // an idle wrap reported while an action plays is stale
-  assert.deepEqual(d.handle({ type: 'idleLoop', id: 'i', loops: 9 }, 119_000), [])
-  assert.equal(d.state().phase, 'action')
-  // the 51 s action ends at 150 s: the first idle wrap after that sleeps (more than 120 s without input)
-  assert.equal(d.handle({ type: 'actionEnded', id }, 150_000)[0]!.type, 'playIdle')
-  assert.deepEqual(d.handle({ type: 'idleLoop', id: 'i', loops: 1 }, 156_000), [{ type: 'sleep' }])
-})
-
-test('a tap while asleep wakes first, then starts an action; an input does not wake', () => {
-  const idles: IdleChoice[] = [{ id: 'i', weight: 1, duration: 6 }]
-  const d = createDirector(cfg({ idles }), seeded(6))
-  d.handle({ type: 'start', entry: 'idle' }, 0)
-  d.handle({ type: 'idleLoop', id: 'i', loops: 1 }, 121_000)
-  assert.equal(d.state().phase, 'asleep')
-  assert.deepEqual(d.handle({ type: 'input' }, 122_000), [])
-  assert.equal(d.state().phase, 'asleep')
-  const wake = d.handle({ type: 'tap' }, 130_000)
-  assert.deepEqual(types(wake), ['wake', 'playAction', 'prepare'])
-  assert.equal(d.state().phase, 'action')
-})
-
 test('a failed action leaves the pool: on a tap the next one starts, on open the model idles', () => {
   const d = createDirector(cfg(), seeded(13))
   d.handle({ type: 'start', entry: 'idle' }, 0)
@@ -290,7 +252,7 @@ test('a failed action that is not the current one only leaves the pool; a droppe
   assert.equal(seen.has(next), false)
 })
 
-test('an empty pool idles, ignores taps, and a tap while asleep only wakes', () => {
+test('an empty pool idles and ignores taps', () => {
   const idles: IdleChoice[] = [{ id: 'i', weight: 1, duration: 6 }]
   const d = createDirector(cfg({ actions: [], idles }), seeded(1))
   const open = d.handle({ type: 'start', entry: 'action' }, 0)
@@ -298,9 +260,8 @@ test('an empty pool idles, ignores taps, and a tap while asleep only wakes', () 
   assert.deepEqual(d.handle({ type: 'tap' }, 1000), [])
   assert.equal(d.state().phase, 'idle')
   d.handle({ type: 'idleLoop', id: 'i', loops: 1 }, 121_000)
-  assert.equal(d.state().phase, 'asleep')
-  assert.deepEqual(d.handle({ type: 'tap' }, 130_000), [{ type: 'wake' }])
   assert.equal(d.state().phase, 'idle')
+  assert.deepEqual(d.handle({ type: 'tap' }, 130_000), [])
 })
 
 test('no idles and no actions: nothing to command, nothing breaks', () => {
@@ -310,38 +271,37 @@ test('no idles and no actions: nothing to command, nothing breaks', () => {
   assert.deepEqual(d.handle({ type: 'idleLoop', id: 'x', loops: 1 }, 2000), [])
 })
 
-test('stop wakes a sleeper, clears the state and makes later events no-ops; start works again', () => {
+test('stop clears the state and makes later events no-ops; start works again', () => {
   const idles: IdleChoice[] = [{ id: 'i', weight: 1, duration: 6 }]
   const d = createDirector(cfg({ idles }), seeded(4))
   d.handle({ type: 'start', entry: 'idle' }, 0)
   d.handle({ type: 'idleLoop', id: 'i', loops: 1 }, 121_000)
-  assert.deepEqual(d.handle({ type: 'stop' }, 122_000), [{ type: 'wake' }])
+  assert.deepEqual(d.handle({ type: 'stop' }, 122_000), [])
   assert.equal(d.state().phase, 'stopped')
   assert.equal(d.state().current, null)
   assert.deepEqual(d.handle({ type: 'tap' }, 123_000), [])
   assert.deepEqual(d.handle({ type: 'actionEnded', id: 'x' }, 124_000), [])
   assert.deepEqual(d.handle({ type: 'stop' }, 125_000), [])
-  // a new start begins afresh: the pool is whole again and the last input is now
+  // a new start begins afresh: the pool is whole again
   const again = d.handle({ type: 'start', entry: 'action' }, 200_000)
   assert.equal(types(again)[0], 'playAction')
   assert.equal(d.state().pool.length, 6)
 })
 
-test('stop while an action plays gives no wake', () => {
+test('stop while an action plays gives no command', () => {
   const d = createDirector(cfg(), seeded(4))
   d.handle({ type: 'start', entry: 'action' }, 0)
   assert.deepEqual(d.handle({ type: 'stop' }, 1000), [])
 })
 
-test('start resets a pool that lost a failed action and the sleep clock', () => {
+test('start resets a pool that lost a failed action', () => {
   const idles: IdleChoice[] = [{ id: 'i', weight: 1, duration: 6 }]
   const d = createDirector(cfg({ idles }), seeded(4))
   const open = d.handle({ type: 'start', entry: 'action' }, 0)
   d.handle({ type: 'actionFailed', id: played(open)! }, 100)
   assert.equal(d.state().pool.length, 5)
-  d.handle({ type: 'start', entry: 'idle' }, 500_000) // a new model: input now
+  d.handle({ type: 'start', entry: 'idle' }, 500_000) // a new model
   assert.equal(d.state().pool.length, 6)
-  assert.deepEqual(d.handle({ type: 'idleLoop', id: 'i', loops: 1 }, 560_000), [])
 })
 
 test('every play is followed by a prepare of the next action when there is one', () => {
@@ -372,9 +332,10 @@ function defaultPool() {
   return resolvePool(items, line, { frame: 'shukra', chosen })
 }
 
-test('400 idle picks on the default weights give 20 % to 30 % borrowed ones', () => {
+test('400 idle picks on Shukra\'s weights give 20 % to 30 % borrowed ones', () => {
   const pool = defaultPool()
-  const idles: IdleChoice[] = pool.idles.map((i) => ({ ...i, duration: 20.5667 })) // own and the lender's UiStand1
+  assert.equal(pool.idles.length, 4) // own and the lender's UiStand1 and StandAct0101
+  const idles: IdleChoice[] = pool.idles.map((i) => ({ ...i, duration: 20.5667 }))
   for (const seed of [1, 2, 3]) {
     const d = createDirector({ actions: pool.actions, idles }, seeded(seed))
     d.handle({ type: 'start', entry: 'idle' }, 0)
@@ -388,23 +349,26 @@ test('400 idle picks on the default weights give 20 % to 30 % borrowed ones', ()
   }
 })
 
-test('400 idle picks with a lender and on a receiver with its own clips only never name StandAct0101', () => {
+test('400 idle picks on a frame that borrows nothing: 32 % to 48 % StandAct0101, the rest UiStand1', () => {
   const names = ['UiStand1', 'StandAct0101']
   const own: PoolItem[] = names.map((name, i) => ({ id: `#${i}`, name, frame: null, duration: 6 }))
-  const lent: PoolItem[] = names.map((name, i) => ({ id: `pavo:anim/manifest.json#${i}`, name, frame: 'pavo', duration: 6 }))
-  const nameOf = (id: string) => names[Number(id.slice(id.lastIndexOf('#') + 1))]
-  const cases: [PoolItem[], string[]][] = [[[...own, ...lent], ['pavo:UiStand1', 'pavo:StandAct0101']], [own, []]]
-  for (const [items, chosen] of cases) {
-    const pool = resolvePool(items, () => true, { frame: 'shukra', chosen: new Set(chosen) })
-    const d = createDirector({ actions: [], idles: pool.idles.map((i) => ({ ...i, duration: 6 })) }, seeded(5))
+  const pool = resolvePool(own, () => true, { frame: 'zero', chosen: new Set() })
+  for (const seed of [1, 2, 3]) {
+    const d = createDirector({ actions: [], idles: pool.idles.map((i) => ({ ...i, duration: 6 })) }, seeded(seed))
     d.handle({ type: 'start', entry: 'idle' }, 0)
-    const picked = new Set([nameOf(d.state().current!)])
+    let standAct = d.state().current === '#1' ? 1 : 0
     for (let n = 1; n < 400; n++) {
       d.handle({ type: 'idleLoop', id: d.state().current!, loops: d.state().idleLoopsWanted }, n)
-      picked.add(nameOf(d.state().current!))
+      if (d.state().current === '#1') standAct++
     }
-    assert.deepEqual([...picked], ['UiStand1'])
+    assert.ok(standAct >= 128 && standAct <= 192, `seed ${seed}: ${standAct} of 400 are StandAct0101`)
   }
+})
+
+test('Pavo\'s StandAct0101 (3.33 s) as an idle plays three loops before the next pick', () => {
+  const d = createDirector({ actions: [], idles: [{ id: 'pavo:StandAct0101', weight: 1, duration: 3.333329916 }] }, seeded(2))
+  d.handle({ type: 'start', entry: 'idle' }, 0)
+  assert.equal(d.state().idleLoopsWanted, 3)
 })
 
 test('borrowed actions are one bag with the own ones: sixteen starts hold each once, none follows itself', () => {
@@ -488,17 +452,11 @@ test('setPool: an action that failed does not come back with a new pool, until t
   assert.deepEqual([...d.state().pool].sort(), ['a1', 'a2', 'a3', 'a4'], 'a start takes the last pool, failed ones included')
 })
 
-test('setPool in stopped issues nothing and the next start uses the new lists; asleep issues nothing either', () => {
+test('setPool in stopped issues nothing and the next start uses the new lists', () => {
   const d = createDirector(cfg({ actions: ['a1', 'a2'] }), seeded(7))
   assert.deepEqual(setPool(d, ['b1', 'b2', 'b3'], 0, [{ id: 'z', weight: 1, duration: 6 }]), [])
   const open = d.handle({ type: 'start', entry: 'action' }, 1)
   assert.ok(['b1', 'b2', 'b3'].includes(played(open)!))
-  d.handle({ type: 'actionEnded', id: d.state().current! }, 2)
-  d.handle({ type: 'idleLoop', id: 'z', loops: 1 }, 121_000)
-  assert.equal(d.state().phase, 'asleep')
-  assert.deepEqual(setPool(d, ['b1'], 122_000), [])
-  assert.deepEqual(d.state().pool, ['b1'])
-  assert.deepEqual(d.handle({ type: 'tap' }, 123_000).map((c) => c.type).slice(0, 2), ['wake', 'playAction'])
 })
 
 test('setPool to an empty pool: the lobby idles and a tap starts nothing', () => {
@@ -528,4 +486,123 @@ test('setPool: 300 starts with random pool changes in between never repeat an ac
       last = id
     }
   }
+})
+
+// ---- interludes: idles that do not loop (add-lobby-fight-idles) ----
+
+const WIN: IdleChoice = { id: 'win', weight: 1, duration: 5.7, once: true }
+const LOOP: IdleChoice = { id: 'loop', weight: 1, duration: 4 }
+const playedIdle = (cs: DirectorCommand[]): string | null => {
+  const c = cs.find((x) => x.type === 'playIdle')
+  return c && c.type === 'playIdle' ? c.id : null
+}
+
+test('the Fight idles and shares agreed for Display', () => {
+  assert.deepEqual([...LOBBY_FIGHT_IDLES], ['Born', 'Stand1', 'Stand2', 'Standchange', 'Save', 'Win', 'LevelAttack08_NunWalk', 'LevelAttack11_Loop', 'LevelAttack013Loop', 'LevelAttack14'])
+  assert.deepEqual({ ...LOBBY_GROUP_SHARES }, { ownFight: 0.6, ownMenu: 0.3, borrowed: 0.1 })
+})
+
+test('an interlude plays once: it counts no loops, and its end picks the next idle', () => {
+  const e = createDirector(cfg({ actions: [], idles: [WIN] }), seeded(1))
+  assert.deepEqual(e.handle({ type: 'start', entry: 'idle' }, 0), [{ type: 'playIdle', id: 'win' }])
+  assert.equal(e.state().idleLoopsWanted, 0)
+  assert.deepEqual(e.handle({ type: 'idleLoop', id: 'win', loops: 5 }, 1000), [], 'a wrap is not an end for an interlude')
+  assert.deepEqual(e.handle({ type: 'idleEnded', id: 'win' }, 6000), [{ type: 'playIdle', id: 'win' }], 'the same interlude again restarts')
+  assert.equal(e.state().current, 'win')
+  assert.equal(e.state().phase, 'idle')
+})
+
+test('after an interlude a looping idle takes over with its own dwell; after a looping idle an interlude takes over', () => {
+  const d = createDirector(cfg({ actions: [], idles: [WIN, LOOP] }), seeded(5))
+  let current = playedIdle(d.handle({ type: 'start', entry: 'idle' }, 0))!
+  let t = 0
+  const seen = new Set<string>()
+  for (let i = 0; i < 200; i++) {
+    t += 10_000
+    const cs = current === 'win' ? d.handle({ type: 'idleEnded', id: 'win' }, t) : d.handle({ type: 'idleLoop', id: current, loops: 1 + i }, t)
+    const next = playedIdle(cs)
+    if (next === null) continue // the same looping idle goes on
+    if (next === 'loop') assert.equal(d.state().idleLoopsWanted, loopsFor(4))
+    if (next === 'win') assert.equal(d.state().idleLoopsWanted, 0)
+    seen.add(`${current}>${next}`)
+    current = next
+  }
+  assert.ok(seen.has('win>loop') && seen.has('loop>win') && seen.has('win>win'), [...seen].join(' '))
+})
+
+test('a stale idleEnded (another id, an action, a looping idle) is ignored', () => {
+  const d = createDirector(cfg({ idles: [WIN] }), seeded(2))
+  d.handle({ type: 'start', entry: 'idle' }, 0)
+  assert.deepEqual(d.handle({ type: 'idleEnded', id: 'other' }, 1000), [])
+  const tap = d.handle({ type: 'tap' }, 2000)
+  assert.equal(d.state().phase, 'action')
+  assert.deepEqual(d.handle({ type: 'idleEnded', id: 'win' }, 2100), [], 'the end of the interlude a tap replaced')
+  assert.equal(d.state().phase, 'action')
+  assert.ok(played(tap))
+  const loopy = createDirector(cfg({ actions: [], idles: [LOOP] }), seeded(2))
+  loopy.handle({ type: 'start', entry: 'idle' }, 0)
+  assert.deepEqual(loopy.handle({ type: 'idleEnded', id: 'loop' }, 1000), [], 'a looping idle does not end')
+})
+
+test('a tap during an interlude starts an action; the action ending then idles again', () => {
+  const d = createDirector(cfg({ idles: [WIN] }), seeded(7))
+  d.handle({ type: 'start', entry: 'idle' }, 0)
+  const tap = d.handle({ type: 'tap' }, 1000)
+  const id = played(tap)!
+  assert.equal(d.state().current, id)
+  const ended = d.handle({ type: 'actionEnded', id }, 30_000)
+  assert.deepEqual(ended.filter((c) => c.type === 'playIdle'), [{ type: 'playIdle', id: 'win' }])
+  assert.equal(d.state().idleLoopsWanted, 0)
+})
+
+test('setPool during an interlude lets it end, and the next pick uses the new idles', () => {
+  const d = createDirector(cfg({ actions: [], idles: [WIN] }), seeded(4))
+  d.handle({ type: 'start', entry: 'idle' }, 0)
+  d.handle({ type: 'setPool', actions: [], idles: [LOOP] }, 1000)
+  assert.equal(d.state().current, 'win')
+  assert.deepEqual(d.handle({ type: 'idleEnded', id: 'win' }, 6000), [{ type: 'playIdle', id: 'loop' }])
+  assert.equal(d.state().idleLoopsWanted, loopsFor(4))
+})
+
+test('with no idles an idleEnded does nothing', () => {
+  const d = createDirector(cfg({ actions: [], idles: [WIN] }), seeded(4))
+  d.handle({ type: 'start', entry: 'idle' }, 0)
+  d.handle({ type: 'setPool', actions: [], idles: [] }, 100)
+  assert.deepEqual(d.handle({ type: 'idleEnded', id: 'win' }, 6000), [])
+})
+
+test('an idle that fails to play leaves the idles until the next start and another is picked; setPool does not bring it back', () => {
+  const d = createDirector(cfg({ actions: [], idles: [WIN, LOOP] }), seeded(6))
+  const first = playedIdle(d.handle({ type: 'start', entry: 'idle' }, 0))!
+  const other = first === 'win' ? 'loop' : 'win'
+  assert.deepEqual(d.handle({ type: 'idleFailed', id: first }, 500).filter((c) => c.type === 'playIdle'), [{ type: 'playIdle', id: other }])
+  assert.equal(d.state().current, other)
+  d.handle({ type: 'setPool', actions: [], idles: [WIN, LOOP] }, 600)
+  for (let i = 0; i < 40; i++) {
+    const cs = other === 'win' ? d.handle({ type: 'idleEnded', id: other }, 1000 + i) : d.handle({ type: 'idleLoop', id: other, loops: 3 + i }, 1000 + i)
+    assert.notEqual(playedIdle(cs), first)
+  }
+  // a stale failure only marks the idle; a failure with nothing left to play changes nothing
+  const e = createDirector(cfg({ actions: [], idles: [LOOP] }), seeded(1))
+  e.handle({ type: 'start', entry: 'idle' }, 0)
+  assert.deepEqual(e.handle({ type: 'idleFailed', id: 'loop' }, 100), [])
+  assert.equal(e.state().phase, 'idle')
+  // a new start gives the failed idle another chance
+  assert.equal(playedIdle(e.handle({ type: 'start', entry: 'idle' }, 200)), 'loop')
+})
+
+// ---- no sleep (port-pgr-updates, from PGR's remove-lobby-sleep) ----
+
+test('with no input at all the idles go on: 500 dwell ends hours apart still pick an idle, and the director stays in idle', () => {
+  const d = createDirector(cfg(), seeded(3))
+  d.handle({ type: 'start', entry: 'idle' }, 0)
+  for (let n = 1; n <= 500; n++) {
+    const current = d.state().current!
+    const cmds = d.handle({ type: 'idleLoop', id: current, loops: d.state().idleLoopsWanted }, n * 3_600_000)
+    assert.equal(d.state().phase, 'idle', `after dwell ${n}`)
+    assert.ok(d.state().current !== null)
+    assert.ok(!types(cmds).some((t) => String(t).includes('sleep')), 'no sleep command exists')
+  }
+  // and a tap after all that starts an action as ever
+  assert.ok(played(d.handle({ type: 'tap' }, 501 * 3_600_000)) !== null)
 })

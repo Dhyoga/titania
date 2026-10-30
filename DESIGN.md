@@ -72,10 +72,11 @@ and the crown within 3 % of the top edge. The same preset is used here; the figu
 the Display frame first ("Shukra · this model", its rows checked, disabled and marked "Always played") and the other frame after it in
 the picker's order. A section is a row with the frame's checkbox (check all, clear all, mixed when some), a count ("9 / 10"; "Could
 not be read" and disabled when the frame has nothing to offer) and a chevron that folds the list; sections start folded except one that is
-partly chosen. Rows: the frame's idle first (`UiStand1`, with "Idle" and its length below; `StandAct0101` is never offered), then every
+partly chosen. Rows: the frame's two idles first (`UiStand1` and `StandAct0101`, the clip name first, "Idle" and the length below), then every
 Board action that has a voice line, each with the line's wiki title ("General Greeting 13", the clip name when there is none), the clip
-name and its length. A clip without a voice line is not listed. Every change is saved at once for the Display frame; "Use default" (enabled
-once something is saved) forgets the frame's choice. The list scrolls inside the popover; a failed save shows the usual "Could not save" line.
+name and its length. A clip without a voice line is not listed. After the Menu sections a **Fight** heading and one section per frame in the same order: the frame's Fight
+idle candidates (clip name, length, "once" for a clip that does not loop). The Display frame's own Fight rows start checked and can be unchecked; another frame's start unchecked.
+Every change is saved at once for the Display frame; "Use default" (enabled once something is saved) forgets the frame's choice, own Fight clips turned off included. The list scrolls inside the popover; a failed save shows the usual "Could not save" line.
 
 **Keys in Display**: `M` mutes, `C` toggles captions, `R` returns the camera to the Display view; `Esc` ends Adjust camera (like Cancel), else
 closes the open popover, else the menu; `Space` and `Enter` are a tap (below), unless focus is on a button, link or other control that uses
@@ -85,10 +86,8 @@ them. `←`, `→`, `L`, `F` and `H` do nothing (there is no player, no Focus).
 
 ```
  open ──▶ ACTION (a pool action + its voice line) ──ends──▶ IDLE ──tap──▶ ACTION …
-                    ▲ tap interrupts                          │ 2 min without input,
-                    └─────────────────────────────────────────┤ at the end of an idle loop
-                                                              ▼
-                                                           ASLEEP (nothing renders) ──tap──▶ ACTION
+                    ▲ tap interrupts                          │ (idles go on picking, with no input too)
+                    └─────────────────────────────────────────┘
 ```
 
 - **On open**, and when the Display model is changed from the Display menu, a random Board action starts with its voice line (the model
@@ -104,13 +103,15 @@ them. `←`, `→`, `L`, `F` and `H` do nothing (there is no player, no Focus).
 - **A tap** on the stage starts the next action, interrupting the one that plays (its line stops, the new action crossfades in). A tap is a
   press and release within 10 px and 500 ms; a press that closes a popover, unpins the menu or happens while the camera is adjusted is not a
   tap; taps closer than 400 ms are ignored; a press on the caption counts (it lets presses through). `Space` and `Enter` do the same.
-- **Idle**: the frame's own `UiStand1` and, when the user chose it in the popover (or by default), the other frame's, playing whole loops
-  for at least 10 s and switching at the end of a loop with a crossfade. The own one takes 75 % of the picks and the borrowed ones
-  together 25 %, evenly by frame; with none borrowed the own one just goes on looping. `StandAct0101` is never played in Display. The
-  loop choice made in Playground never makes an action loop.
+- **Idle**: three groups of candidates: the frame's own **Fight** clips (`Born`, `Stand1`, `Stand2`, `Standchange`, `Save`, `Win`, and Pavo's `LevelAttack14`), its own
+  **Menu** idles (`UiStand1` 3, `StandAct0101` 2) and what the user borrowed from the other frame (by default its two Menu idles). They take 60 %, 30 % and 10 % of the picks,
+  renormalized over the groups that are not empty (Shukra's default: each Fight clip 10 %, `UiStand1` 18 %, `StandAct0101` 12 %, Pavo's two idles 6 % and 4 %). A looping
+  clip plays whole loops for at least 10 s and the next pick crossfades in at the end of a loop; a clip that does not loop (`Born`, `Standchange`, `Win`, `LevelAttack14`)
+  plays once, as an interlude, and the next pick follows. A Fight clip shows the meshes of the Menu idle's rule (Qu hides nothing), has no voice line, and a borrowed one
+  hangs its cloth as in the shown model's Fight idle. The loop choice made in Playground never makes an action loop. Leaving Display during a Fight clip opens Playground in Fight with it selected.
 - **The next action is prepared** a second after a clip starts (its clip built, its line decoded), so a tap needs no request.
-- **Sleep**: after 2 minutes without input, at the end of an idle loop, the pose is paused and nothing renders; a tap wakes it. Never in
-  an action, never while the camera is adjusted.
+- **No sleep**: Display keeps playing for as long as it is open (it renders at most 30 fps; a closed or hidden panel renders nothing). It always follows the animation,
+  whatever Playground's "Follow animation" says, so a low pose never leaves the bust framing; that setting applies again in Playground.
 - **Speed**: Display always plays at 1×; the Playground speed comes back with Playground.
 
 ## Panel layout (top to bottom)

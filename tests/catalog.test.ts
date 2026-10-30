@@ -419,3 +419,17 @@ test('a frame with a clip set keeps defaultClip, and its defaultItem names that 
 test('no clip set and no source: no list', () => {
   assert.equal(withSources(null, [], 'menu'), null)
 })
+
+// ---- Display reads both lists (port-pgr-updates): the Menu and the Fight list of one model share no item id ----
+
+test('the Menu and the Fight list of Shukra and of Pavo share no item id, so Display can tag items by list', { skip }, () => {
+  for (const shown of ['shukra', 'pavo']) {
+    const idsOf = (context: 'menu' | 'fight') => withSources(buildCatalog(manifestOf(shown), context), sourcesFor(shown), context).groups.flatMap((g) => g.items.map((i) => i.id))
+    const menu = idsOf('menu')
+    const fight = idsOf('fight')
+    assert.ok(menu.length > 0 && fight.length > 0, shown)
+    assert.deepEqual(menu.filter((id) => fight.includes(id)), [], `${shown}: ids are unique across the two lists`)
+    assert.equal(new Set([...menu, ...fight]).size, menu.length + fight.length, shown)
+  }
+})
+
