@@ -247,14 +247,20 @@ the top. Whether the Qu preset should be tuned is a question for Erza's own meas
   work. **Method: world-space direction matching.** Per key, forward kinematics gives the source bones' world rotations; each matched
   `Bip001…` bone gets `W_t = W_s · W_s_rest⁻¹ · A · W_t_rest` in the target parent's frame, where `A` turns the target's rest direction towards
   its main child joint into the source's (`mainChild`). The hand is aligned on two axes (finger direction and palm). Bones without a main
-  child (head, toes, finger tips, props) use `A` = identity. Matching is by `Bip001…` name (Biped names, spaces removed).
+  child (head, toes, finger tips, props) and **the feet** use `A` = identity (`fix-erza-retarget-limbs`): a foot takes the source foot's change of world
+  rotation from its rest pose, so a foot planted flat on the source is flat on the target, whatever the rest pitch of the two foot bones (ankle→toe 67° below
+  horizontal on Shukra, 60° Pavo, 40° Erza). Matching is by `Bip001…` name (Biped names, spaces removed). **Twist bones the source lacks follow their main bone**
+  (`TWIST_FOLLOWS`: `Bip001{L,R}CalfTwist` → the calf, `Bip001{L,R}ThighTwist` → the thigh; `W_main · W_main_rest⁻¹ · W_twist_rest`); a source that has the
+  bone drives it. Only Erza has such bones among the frames.
 - **Accuracy on Qu** (direction of every main limb bone against the source model playing the clip, eight sampled keys of `UiStand1`,
   `BoardAct0201` and `Run`, both directions): **mean 0.06° (Shukra → Pavo) and 0.07° (Pavo → Shukra), at most 0.3° per bone**; palms within
-  5°. Bianca's four frames gave at most 0.7°. The tests bound the error at 15° per bone, 5° on average and 5° on palms.
-- **Feet.** The lowest foot point stays within 1.0 cm (Pavo → Shukra) of the source's floor contact, as the spec asks (2 cm). **Shukra → Pavo
-  comes out 2.7 cm off** (the test allows 3 cm for that direction only): Pavo's rest toes are 1 cm above the floor while Shukra's are on it,
-  and scaling the pelvis by the ratio of heights (0.968 / 0.959) cannot absorb that, so Pavo's toes dip about 2.9 cm below their rest level
-  (about 1.9 cm under the floor). Not fixed here (the spec does not ask for it); revisit with Erza's measurements, since her rig is a third one.
+  5°. Bianca's four frames gave at most 0.7°. The tests bound the error at 15° per bone, 5° on average and 5° on palms. The feet are not in that measure since
+  `fix-erza-retarget-limbs` (their direction toward the toe differs from the source's by design, up to 27° between rest poses): they are compared by their
+  change of world rotation from rest, which the alignment keeps exactly (bound 1°).
+- **Feet.** The lowest foot point against the source's floor contact, each relative to its rest pose (`UiStand1` / `Run`): **Pavo → Shukra 0.3 / 0.1 cm,
+  Shukra → Pavo −1.9 / −1.9 cm**, inside the 2 cm the spec asks for (`FEET_TOLERANCE` 2 cm both ways). Before `fix-erza-retarget-limbs`, with the foot pointed
+  at its toe like the other limb bones, they were 1.0 and −2.7 cm (the test allowed 3 cm): Pavo's rest foot is steeper than a flat sole needs, and scaling the
+  pelvis by the ratio of heights (0.968 / 0.959) cannot absorb that.
 - **Root**: only `Bip001` gets a position (its world offset from rest, scaled by the pelvis-height ratio); the parents are taken at rest.
   Face weights map by mesh role (`Face`, `Eye`, `EX` copies included: `meshRole`) and morph target name; a name the target lacks is dropped
   (Pavo's `Face` has 21 targets against Shukra's 35).
@@ -376,24 +382,25 @@ Measured on the first conversion (`node scripts/convert-fbx.ts "data/erza/source
 - **Retargeting accuracy** (Shukra and Pavo `UiStand1`, `BoardAct0201`, `Run` onto her, eight keys each, the test's measure): mean **0.06°
   (Shukra) and 0.07° (Pavo)**, at most 0.3° per bone, palms within 0.6°. Her hierarchy is Pavo's, not Shukra's. Her root follows the
   source's (Shukra's `BoardAct1004` travels 2.4 m forward in its own model and 2.75 m on her).
-- **Feet.** The lowest foot point on her sits **4.5 to 10.4 cm below** where the source puts its own, relative to each rest pose (Shukra →
-  Erza `UiStand1` 8.0, `BoardAct0201` 5.9, `Run` 8.0 cm; Pavo → Erza 4.5, 5.0, 10.0 cm), far over the 2 cm that Qu's frames meet. The cause is
-  not the pelvis ratio (1.158 against a leg ratio of 1.119 gives almost the same height for `UiStand1`): direction matching turns her foot
-  bone to **Shukra's foot direction**, which points steeply down (the toe 0.121 m under the ankle over 0.132 m), and her foot bone is longer
-  (0.213 m), so her toe lands at −2.9 cm where her flat boot rests at +3.7 cm. **Decision: a bound with its reason** (`FEET_TOLERANCE` in
-  `tests/retarget.test.ts`: 9 cm from Shukra, 11 cm from Pavo; measured 8.0 and 10.0): without a floor drawn, standing she is 4.5 cm under y = 0
-  at worst, which the panel does not show. A ground correction on the pelvis would not help (see above); the real fix is treating the foot bone
-  by its rest-relative pitch, which changes Qu's pairs too, so it is a change of its own.
+- **Feet.** `add-erza-model` found her lowest foot point **4.5 to 10.4 cm below** where the source puts its own, relative to each rest pose (Shukra →
+  Erza `UiStand1` 8.0, `BoardAct0201` 5.9, `Run` 8.0 cm; Pavo → Erza 4.5, 5.0, 10.0 cm). The cause was not the pelvis ratio (1.158 against a leg ratio
+  of 1.119: a pelvis scaled by the leg ratio moved her by under 0.4 cm): direction matching turned her foot bone to **Shukra's foot direction**, which
+  points steeply down (the toe 0.121 m under the ankle over 0.132 m), and her foot bone is longer (0.213 m), so her toe landed at −2.9 cm where her flat
+  boot rests at +3.7 cm. **`fix-erza-retarget-limbs` gives the foot `A` = identity** and the figures become Shukra → Erza `UiStand1` −3.0 cm, `Run` −6.0 cm,
+  Pavo → Erza −0.7 and −7.3 cm; `FEET_TOLERANCE` is 6.5 cm from Shukra and 8 cm from Pavo (measured values rounded up by 0.5 cm). **What is left is the foot
+  bone's length**: in a push-off the source toe is plantar-flexed and her toe, 1.6 times as far from the ankle (her legs are 1.1 times), dips 6 to 7 cm
+  below where the scaled source toe would be. In the panel her feet stand on the floor in `UiStand1` and `Run`; fixing the push-off needs floor-contact
+  detection (an ankle IK), which is a change of its own if it is ever wanted.
 - **Known limits, as planned.** Skirt, hair and ribbons hold their bind pose (in a `Run`, a `Walk` or a kick the stiff skirt parts and shows a
   thigh, or the white garment under it); the face has no morph targets and is bone-driven, so it stays still.
 - **Played in the panel** (every Menu item of both sources, 24, and every Fight item, 22, at two moments each, toon on, contact planner on as in
   the panel): all start and end without an error, none puts a hand through the body or a hand on the hip wrongly, arms that cross the chest in
   Pavo's `BoardAct0201`/`1005`/`1007` only touch the armour. Shukra's `BoardAct1004` is a sitting action and she sits on nothing, as in
-  its own model. **One defect that is not a known limit: black strips stretch off her boots in strong knee bends**, worst in Pavo's `Executioner01`,
+  its own model. **One defect that was not a known limit: black strips stretched off her boots in strong knee bends**, worst in Pavo's `Executioner01`,
   `02`, `04`, `05` (also `03` and Shukra's `BoardAct1004` and `Run`). Cause confirmed by a render: `Bip001LCalfTwist`/`RCalfTwist` are children
-  of the thigh and get no track from either source, so they stay straight while the calf bends and the ankle vertices that carry their weight are
-  pulled toward them. With the twist bone given the calf's rotation the strip is gone. Not fixed here (a rule in `retarget.ts` for target
-  bones the source lacks, which the spec does not ask for): see "Possible later changes".
+  of the thigh and got no track from either source, so they stayed straight while the calf bent and the ankle vertices that carry their weight were
+  pulled toward them. **Fixed by `fix-erza-retarget-limbs`** (the twist bones follow their calf, and `ThighTwist` its thigh when the source lacks it): the same
+  seven clips replayed in the panel show no stretched boots, and Qu's lent clips on each other (Board actions, `Run`, `Walk`, Pavo's kicks on Shukra) look right.
 - **Voice.** Shukra's and Pavo's Board actions on her play their own frame's line and subtitle (checked: Pavo `BoardAct0201`/`0202` with Pavo's
   text, Shukra `BoardAct1004` with Shukra's); at 41.88 s of `Shukra · BoardAct1004` (clip 41.83 s, line 41.92 s) the timeline is in its idle
   segment and the cached idle is Shukra's `UiStand1` retargeted onto her (`shukra/anim/manifest.json#69@erza/erza-scarlet/menu`).
@@ -509,11 +516,10 @@ Changes, in order:
 2. `add-erza-model` — Erza Scarlet's FBX converted to GLB (a spike first, go/no-go: go), added as a frame with one skin (Playground only), her
    animation list made only of Shukra's and Pavo's retargeted clips, her own toon shading (diffuse + `_SH`), and the idle tail for a model with
    no `UiStand1`. It records what was measured (the "Erza" section above). **Heaven's Wheel Armor is out of scope** for now.
+   `fix-erza-retarget-limbs` followed it: the foot alignment and the twist-follow rule in `retarget.ts` that the panel check of this change called for.
 3. `erza-only-companion` — Shukra and Pavo stop being frames (no picker, never shown, still the animation and voice sources), one merged
    source grouped by source, Display shows Erza, the PGR-only rendering paths are removed.
 
-Possible later changes (not planned): the calf-twist defect (see "Erza": a retarget rule so a target bone the source lacks, `Bip001LCalfTwist` and
-`RCalfTwist`, follows its calf, which removes the stretched boot strips in kicks) and the foot bone's rest-relative pitch (the 4.5 to 10 cm of sinking),
-both in `retarget.ts` and so touching Qu's pairs; Erza's sword on her hand; Erza's second model; Pavo's second `UiStand1`; a face mapping for Erza (her face is bone-driven,
+Possible later changes (not planned): floor contact for the feet (the 6 to 7 cm left in `Run` onto Erza, see "Erza"); Erza's sword on her hand; Erza's second model; Pavo's second `UiStand1`; a face mapping for Erza (her face is bone-driven,
 Qu's clips animate morph targets); porting what PGR has added since `baeda85` (see "PGR since the copy"); decoding in a Worker if the 70 ms
 bound is ever too slow; tuning the Display framing for Erza's own bounds.

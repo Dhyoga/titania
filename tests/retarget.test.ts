@@ -140,6 +140,7 @@ function clipOf(frame: Frame, name: string): Clip {
 }
 
 const MAIN_BONES = ['Bip001Spine', 'Bip001Spine1', 'Bip001Spine2', 'Bip001Neck', 'Bip001Head', ...['L', 'R'].flatMap((side) => ['Clavicle', 'UpperArm', 'Forearm', 'Hand', 'Thigh', 'Calf', 'Foot'].map((part) => `Bip001${side}${part}`))]
+const FOOT_BONE = /^Bip001[LR]Foot$/
 const keysOf = (clip: Clip) => [...new Set([0, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 1].map((f) => Math.round(f * (clip.count - 1))))]
 
 test('real data: retargeted limbs point where the source model points, palms included, from Shukra to Pavo and back', { skip }, () => {
@@ -175,10 +176,16 @@ function checkLimbs(from: Frame, to: Model, report: string[]): void {
         const s = source.byName.get(bone)!
         const t = target.byName.get(bone)!
         const child = mainChild(bone)
+        // The head and the feet keep the source's change of world rotation instead of pointing at a joint (feet: fix-erza-retarget-limbs).
+        const byRotation = child === null || FOOT_BONE.test(bone)
         const error =
-          child === null
+          byRotation
             ? qangle(qmul(sw.rotations[s]!, qinv(sourceRest.rotations[s]!)), qmul(tw.rotations[t]!, qinv(targetRest.rotations[t]!))) // the head: its change of world rotation
             : vangle(sub(sw.translations[source.byName.get(child)!]!, sw.translations[s]!), sub(tw.translations[target.byName.get(child)!]!, tw.translations[t]!))
+        if (FOOT_BONE.test(bone)) {
+          assert.ok(error < 1, `${from}→${to} ${name} key ${k}: ${bone} turned differently from the source's by ${error.toFixed(2)}°`)
+          continue
+        }
         assert.ok(error < 15, `${from}→${to} ${name} key ${k}: ${bone} off by ${error.toFixed(1)}°`)
         sum += error
         n++
@@ -197,14 +204,13 @@ function checkLimbs(from: Frame, to: Model, report: string[]): void {
   }
 }
 
-// The spec asks for 2 cm (Pavo's Run on Shukra). Shukra's clips on Pavo come out 2.7 cm off: Pavo's rest toes are 1 cm above the floor,
-// Shukra's are on it, and scaling the pelvis by the ratio of heights cannot absorb that. Measured, not specified: see AGENTS.md.
-// Onto Erza they come out 4.5 to 10.4 cm lower (add-erza-model spike): direction matching turns her foot bone to the source's foot direction, which
-// points steeply down (Shukra's toe is 0.121 m under the ankle over a 0.132 m bone), and her foot bone is longer (0.213 m), so her toe lands about 6.6 cm
-// below where her flat boot rests. Bounded here at the measured values (Shukra 8.0, Pavo 10.0 cm), rounded up.
-const FEET_TOLERANCE: Record<string, number> = { 'pavo→shukra': 0.02, 'shukra→pavo': 0.03, 'shukra→erza': 0.09, 'pavo→erza': 0.11 }
+// The spec asks for 2 cm between Qu's frames, which holds since the feet keep their rest-relative pitch (fix-erza-retarget-limbs: Shukra → Pavo -1.9 cm, was
+// -2.7 with the foot pointed at its toe; Pavo → Shukra 0.3). Onto Erza (measured with the real code: Shukra 3.0 cm in `UiStand1` and 6.0 in `Run`, Pavo 0.7 and 7.3,
+// was 8.0 and 10.0) the rest is her foot bone's length, 0.213 m against Shukra's 0.132 m: in a push-off her toe dips below where the scaled source toe would be.
+// Bounded at the measured values rounded up by 0.5 cm; see AGENTS.md.
+const FEET_TOLERANCE: Record<string, number> = { 'pavo→shukra': 0.02, 'shukra→pavo': 0.02, 'shukra→erza': 0.065, 'pavo→erza': 0.08 }
 
-test('real data: the feet stay within 2 cm (3 cm onto Pavo, 9 to 11 cm onto Erza) of where the source puts them relative to the floor', { skip }, () => {
+test('real data: the feet stay within 2 cm between Shukra and Pavo, and within 6.5 and 8 cm onto Erza, of where the source puts them relative to the floor', { skip }, () => {
   const lowest = (rig: Rig, clip: Clip): number => {
     const ids = ['Bip001LToe0', 'Bip001RToe0', 'Bip001LFoot', 'Bip001RFoot'].map((n) => rig.byName.get(n)!)
     const rest = worldPose(rig, restPose(rig))
@@ -268,6 +274,47 @@ test('real data: onto Erza only Bip001 bones are driven, only the pelvis root ha
       assert.ok(!driven.some((n) => /^Bone_/.test(n)), `${from} ${name}: skirt, hair, ribbon or face bone driven`)
       assert.ok(!driven.some((n) => /Prop/.test(n)), `${from} ${name}: a prop is driven`)
       assert.deepEqual(out.tracks.filter((t) => t.property === 'position').map((t) => erza.nodes[t.node]!.name), ['Bip001'])
+    }
+  }
+})
+
+test('real data: onto Erza her calf and thigh twist bones are driven: followed from Shukra, taken from Pavo\'s own where Pavo has them', { skip: skipErza }, () => {
+  const erza = rigOf('erza')
+  const rest = worldPose(erza, restPose(erza))
+  const change = (w: ReturnType<typeof worldPose>, rig: Rig, name: string) => qmul(w.rotations[rig.byName.get(name)!]!, qinv(rest.rotations[rig.byName.get(name)!]!))
+  for (const from of FRAMES) {
+    const source = rigOf(from)
+    const sourceRest = worldPose(source, restPose(source))
+    for (const name of ['UiStand1', 'BoardAct0201', 'Run']) {
+      const clip = clipOf(from, name)
+      const out = retargetClip(clip, source, erza)
+      for (const side of ['L', 'R']) {
+        for (const twist of [`Bip001${side}CalfTwist`, `Bip001${side}ThighTwist`]) {
+          assert.ok(out.tracks.some((t) => t.node === erza.byName.get(twist) && t.property === 'quaternion'), `${from} ${name}: ${twist} has a track`)
+        }
+      }
+      for (const k of keysOf(clip)) {
+        const sp = restPose(source)
+        applyClipKey(sp, clip, k)
+        const sw = worldPose(source, sp)
+        const tp = restPose(erza)
+        applyClipKey(tp, out, k)
+        const tw = worldPose(erza, tp)
+        for (const side of ['L', 'R']) {
+          // neither source has a CalfTwist: it turns with her calf (within 0.1°: the output tracks are single precision)
+          const calf = qangle(change(tw, erza, `Bip001${side}Calf`), change(tw, erza, `Bip001${side}CalfTwist`))
+          assert.ok(calf < 0.1, `${from} ${name} key ${k}: ${side} calf twist is ${calf.toFixed(3)}° from her calf's turn`)
+          if (from === 'shukra') {
+            const thigh = qangle(change(tw, erza, `Bip001${side}Thigh`), change(tw, erza, `Bip001${side}ThighTwist`))
+            assert.ok(thigh < 0.1, `shukra ${name} key ${k}: ${side} thigh twist is ${thigh.toFixed(3)}° from her thigh's turn`)
+          } else {
+            // Pavo has it: Pavo's own track, whose change of world rotation carries over exactly (no main child)
+            const s = source.byName.get(`Bip001${side}ThighTwist`)!
+            const own = qangle(qmul(sw.rotations[s]!, qinv(sourceRest.rotations[s]!)), change(tw, erza, `Bip001${side}ThighTwist`))
+            assert.ok(own < 0.1, `pavo ${name} key ${k}: ${side} thigh twist is ${own.toFixed(3)}° from Pavo's own`)
+          }
+        }
+      }
     }
   }
 })
@@ -394,4 +441,96 @@ test('contact: the weight is 1 at the hip, 0 away from it, and fades in between'
   assert.equal(contactWeight(0.02, 0.1, 0, 0.2), 0, 'in front of the belly, across the body')
   const between = contactWeight(0.19, 0.1, 0, 0.2)
   assert.ok(between > 0 && between < 1, `fades: ${between}`)
+})
+
+// ---- the foot and the twist bones (fix-erza-retarget-limbs): synthetic rigs
+
+/** A one-leg rig: `Bip001` > pelvis > thigh > calf > foot > toe, and optionally a twist bone that hangs from the thigh beside the calf (rolled 2° at rest). */
+function leg(toe: [number, number, number], twist: boolean): Rig {
+  const roll = [0, Math.sin(Math.PI / 180), 0, Math.cos(Math.PI / 180)]
+  const nodes: object[] = [
+    { name: 'Bip001', children: [1], translation: [0, 1, 0] },
+    { name: 'Bip001Pelvis', children: [2] },
+    { name: 'Bip001LThigh', children: twist ? [3, 6] : [3], translation: [0.1, 0, 0] },
+    { name: 'Bip001LCalf', children: [4], translation: [0, -0.45, 0] },
+    { name: 'Bip001LFoot', children: [5], translation: [0, -0.45, 0] },
+    { name: 'Bip001LToe0', translation: toe },
+  ]
+  if (twist) nodes.push({ name: 'Bip001LCalfTwist', translation: [0, -0.45, 0], rotation: roll })
+  return rigFromGltf({ nodes })
+}
+
+/** The calf (node 3) bent about X by `degrees` at keys 0, 1, 2; extra constant tracks for the twist bone when given. */
+function bend(degrees: number[], twistDegrees?: number[]): Clip {
+  const q = (d: number) => [Math.sin((d * Math.PI) / 360), 0, 0, Math.cos((d * Math.PI) / 360)]
+  const track = (node: number, ds: number[]) => ({ node, property: 'quaternion' as const, size: 4, constant: false, values: Float32Array.from(ds.flatMap(q)) })
+  return { name: 'bend', duration: 2, count: degrees.length, times: Float32Array.from(degrees.map((_, i) => i)), morphs: [], tracks: [track(3, degrees), ...(twistDegrees ? [track(6, twistDegrees)] : [])] }
+}
+
+const worldChange = (rig: Rig, out: Clip, node: number, key: number) => {
+  const rest = worldPose(rig, restPose(rig))
+  const pose = restPose(rig)
+  applyClipKey(pose, out, key)
+  const w = worldPose(rig, pose)
+  return { rest, w, delta: qmul(w.rotations[node]!, qinv(rest.rotations[node]!)) }
+}
+
+test('twist: a twist bone the source lacks follows the calf through a bent knee and keeps its rest offset', () => {
+  const source = leg([0, -0.12, 0.05], false)
+  const target = leg([0, -0.14, 0.16], true)
+  const out = retargetClip(bend([0, 45, 90]), source, target)
+  const twist = target.byName.get('Bip001LCalfTwist')!
+  assert.ok(out.tracks.some((t) => t.node === twist && t.property === 'quaternion'), 'the twist bone gets a track')
+  for (const key of [0, 1, 2]) {
+    const { rest, w } = worldChange(target, out, twist, key)
+    const calf = target.byName.get('Bip001LCalf')!
+    const calfChange = qmul(w.rotations[calf]!, qinv(rest.rotations[calf]!))
+    const twistChange = qmul(w.rotations[twist]!, qinv(rest.rotations[twist]!))
+    // the twist bone turns with the calf from its own rest pose (the 2° roll stays)
+    assert.ok(qangle(calfChange, twistChange) < 0.01, `key ${key}: the twist bone is ${qangle(calfChange, twistChange).toFixed(3)}° from the calf's turn`)
+    const offset = qmul(qinv(w.rotations[calf]!), w.rotations[twist]!)
+    const restOffset = qmul(qinv(rest.rotations[calf]!), rest.rotations[twist]!)
+    assert.ok(qangle(offset, restOffset) < 0.01, `key ${key}: the offset from the calf is its rest offset`)
+  }
+  assert.ok(qangle(worldChange(target, out, twist, 2).delta, [0, 0, 0, 1]) > 80, 'it really bent')
+  assert.ok(out.tracks.every((t) => target.nodes[t.node]!.name.startsWith('Bip001')), 'Bip001 tracks only')
+})
+
+test('twist: a source that has the twist bone drives it; the follow rule does not apply', () => {
+  const source = leg([0, -0.12, 0.05], true)
+  const target = leg([0, -0.14, 0.16], true)
+  // the source's twist bone turns less than its calf
+  const out = retargetClip(bend([0, 40, 80], [0, 10, 20]), source, target)
+  const twist = target.byName.get('Bip001LCalfTwist')!
+  const track = out.tracks.filter((t) => t.node === twist)
+  assert.equal(track.length, 1, 'one track, from the match by name')
+  const { delta } = worldChange(target, out, twist, 2)
+  const sourceChange = worldChange(source, bend([0, 40, 80], [0, 10, 20]), source.byName.get('Bip001LCalfTwist')!, 2).delta
+  assert.ok(qangle(delta, sourceChange) < 0.01, 'it follows the source twist bone, not the calf')
+})
+
+test('twist: a target without the twist bone gets no extra track; with it, exactly one more', () => {
+  const source = leg([0, -0.12, 0.05], false)
+  const rotations = (target: Rig) => retargetClip(bend([0, 45, 90]), source, target).tracks.filter((t) => t.property === 'quaternion')
+  const plain = leg([0, -0.14, 0.16], false)
+  assert.equal(rotations(plain).length, 6, 'Bip001, pelvis, thigh, calf, foot, toe: the matched bones')
+  const withTwist = leg([0, -0.14, 0.16], true)
+  assert.equal(rotations(withTwist).length, 7)
+  assert.equal(rotations(withTwist).filter((t) => withTwist.nodes[t.node]!.name === 'Bip001LCalfTwist').length, 1)
+})
+
+test('foot: it takes the source foot\'s change of world rotation, whatever its rest direction', () => {
+  // Steep source foot (toe 0.12 under the ankle), flatter target foot: pointing at the toe would tilt the target's foot to the source's.
+  const source = leg([0, -0.12, 0.05], false)
+  const target = leg([0, -0.14, 0.16], true)
+  const clip = bend([0, 45, 90])
+  const out = retargetClip(clip, source, target)
+  const foot = (rig: Rig) => rig.byName.get('Bip001LFoot')!
+  for (const key of [0, 1, 2]) {
+    const a = worldChange(source, clip, foot(source), key).delta
+    const b = worldChange(target, out, foot(target), key).delta
+    assert.ok(qangle(a, b) < 0.01, `key ${key}: the foot's change of world rotation is the source's (${qangle(a, b).toFixed(3)}°)`)
+  }
+  // and at rest it is the target's own pose: the same clip key 0 changes nothing
+  assert.ok(qangle(worldChange(target, out, foot(target), 0).delta, [0, 0, 0, 1]) < 0.01)
 })

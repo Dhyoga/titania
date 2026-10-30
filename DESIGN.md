@@ -208,7 +208,8 @@ Shukra's Generic with the stored value untouched. In Playground she is shown lik
 
   The field shows a borrowed clip as `Pavo · BoardAct0201`. Group headers stay visible while the long list scrolls.
 - **How a borrowed clip looks**: the body moves as in its own frame (bones matched by name, corrected for the two rest poses, the pelvis
-  scaled to the shown model's height); the face takes the source's expressions where the shown face has the same expression. **Hair,
+  scaled to the shown model's height; a foot keeps the source foot's turn from its rest pose, so a flat foot stays flat, and a twist bone the source lacks, Erza's calf
+  and thigh twists, turns with its calf or thigh); the face takes the source's expressions where the shown face has the same expression. **Hair,
   cloth and helper bones do not swing** on borrowed clips (there is no physics), but they hang as the shown model's own idle has them
   (its mean pose). **On Erza they hold their bind pose** (she has no idle of her own to take a mean from): her skirt, hair and ribbons stand
   stiff, and her face (bone-driven, while Qu's clips animate morph targets) stays still. Known limits, not bugs. **A hand that rests on the hip** rests on the hip of the shown body too, whatever the arm lengths of the two models.

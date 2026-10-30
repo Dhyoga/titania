@@ -9,7 +9,9 @@
 //     bone whose rest direction (towards its main child joint) differs on the two rigs points where the source bone points:
 //       W_target = W_source · W_source_rest⁻¹ · A · W_target_rest,  A = shortest rotation from the target's to the source's rest direction
 //     and the local rotation is that world rotation in the target parent's frame. Bones without a main child (head, toes, finger tips,
-//     props) use A = identity. The hand also matches its roll: A turns the target's rest (finger direction, palm) frame into the
+//     props) use A = identity, and so do the feet: a foot takes the source foot's change of world rotation from its rest pose, so a foot
+//     planted flat on the source is flat on the target. (Pointing the foot at its toe, like the other limb bones, tilted Erza's boots to
+//     Shukra's steep foot, which sinks them: add-erza-model measured 4.5 to 10 cm, fix-erza-retarget-limbs 0.7 to 7 cm.) The hand also matches its roll: A turns the target's rest (finger direction, palm) frame into the
 //     source's, because where the finger roots sit in the hand differs by 13 to 22° between the models.
 //   - `local`: q_target = r_target · r_source⁻¹ · q_source per bone (local rest rotations); only right where both rigs give the bone the
 //     same parent and the same rest frame. Kept to measure against (tests/retarget.test.ts).
@@ -17,7 +19,9 @@
 // Weapon props (`Bip001Prop…`) are not copied: the frames hold different weapons (Crepuscule's own clips move a sword the model does not
 // show; Veritas holds a rifle in her left hand, Stigmata a bow in her right). A target prop that sits on a hand at rest (every prop of
 // the four rigs does, within 4 cm) stays held by that hand, rigidly; any other prop stays at rest.
-// Morph weights follow by mesh role (`Face`, `Eye`, see `meshRole`) and morph target name. Bones the source does not drive stay at rest.
+// Twist bones the source lacks follow their main bone (`TWIST_FOLLOWS`): a bone that hangs off the thigh beside the calf stays straight while
+// the knee bends if nothing drives it, and drags the ankle's skin with it (black strips off Erza's boots in a kick).
+// Morph weights follow by mesh role (`Face`, `Eye`, see `meshRole`) and morph target name. Other bones the source does not drive stay at rest.
 import type { Clip, ClipMorphTrack, ClipTrack } from './clip.ts'
 import { createContactPlanner } from './contact.ts'
 import { restPose, worldPose } from './fk.ts'
@@ -48,6 +52,18 @@ const BONE_PREFIX = 'Bip001'
 const PROP = /^Bip001Prop\d+$/
 /** A prop this close to a hand at rest is held by that hand. */
 const HELD_DISTANCE = 0.1
+/** Feet keep `A` = identity (see the header). */
+const FOOT = /^Bip001[LR]Foot$/
+/**
+ * Twist bones that follow a matched bone when the source has no bone of their name: twist → the bone it belongs to. Only these four: a rule by name
+ * pattern would reach bones nobody has checked (`ForeTwist` and `UpArmTwist` exist on Pavo only, so no target lacks the source's).
+ */
+const TWIST_FOLLOWS: readonly (readonly [twist: string, main: string])[] = [
+  ['Bip001LCalfTwist', 'Bip001LCalf'],
+  ['Bip001RCalfTwist', 'Bip001RCalf'],
+  ['Bip001LThighTwist', 'Bip001LThigh'],
+  ['Bip001RThighTwist', 'Bip001RThigh'],
+]
 const ROOT_BONE = 'Bip001'
 const PELVIS = 'Bip001Pelvis'
 
@@ -183,7 +199,7 @@ export function retargetClip(clip: Clip, source: Rig, target: Rig, options: Reta
   const correction = new Map<number, Quat>()
   for (const [s, t] of pairs) {
     let align: Quat = [...IDENTITY] as Quat
-    const child = mainChild(target.nodes[t]!.name)
+    const child = FOOT.test(target.nodes[t]!.name) ? null : mainChild(target.nodes[t]!.name)
     const sc = child === null ? undefined : source.byName.get(child)
     const tc = child === null ? undefined : target.byName.get(child)
     if (sc !== undefined && tc !== undefined) {
@@ -217,7 +233,26 @@ export function retargetClip(clip: Clip, source: Rig, target: Rig, options: Reta
     return rig.order.filter((i) => need.has(i))
   }
   const sourceNodes = withParents(source, [...pairs.map(([s]) => s), ...(sourceRoot === undefined ? [] : [sourceRoot])])
-  const targetNodes = withParents(target, pairs.map(([, t]) => t))
+  // Twist bones that follow a matched bone (see `TWIST_FOLLOWS`): the target has both, the source has the main bone but not the twist bone, and nothing hangs
+  // from the twist bone (its world rotation is set after its main bone's, at the end of the parents-first order).
+  const matched = new Set(pairs.map(([, t]) => t))
+  const followers: { node: number; main: number }[] = []
+  for (const [twist, main] of TWIST_FOLLOWS) {
+    const node = target.byName.get(twist)
+    const mainNode = target.byName.get(main)
+    if (node === undefined || mainNode === undefined || matched.has(node) || !matched.has(mainNode)) continue
+    if (source.byName.has(twist) || target.nodes.some((n) => n.parent === node)) continue
+    followers.push({ node, main: mainNode })
+  }
+  const followerNodes = new Set(followers.map((f) => f.node))
+  const targetNodes = [...withParents(target, [...pairs.map(([, t]) => t), ...followers.map((f) => f.node)]).filter((i) => !followerNodes.has(i)), ...followers.map((f) => f.node)]
+  const followerMain = new Int32Array(target.nodes.length).fill(-1)
+  /** W_main_rest⁻¹ · W_twist_rest: the twist bone's own offset from its main bone. */
+  const followerOffsets = new Float64Array(target.nodes.length * 4)
+  for (const { node, main } of followers) {
+    followerMain[node] = main
+    followerOffsets.set(qmul(qinv(targetRest.rotations[main]!), targetRest.rotations[node]!), node * 4)
+  }
   const rotationTrack: (ClipTrack | undefined)[] = new Array(source.nodes.length)
   const positionTrack: (ClipTrack | undefined)[] = new Array(source.nodes.length)
   for (const t of clip.tracks) {
@@ -246,6 +281,7 @@ export function retargetClip(clip: Clip, source: Rig, target: Rig, options: Reta
 
   const outputs: (Float32Array | undefined)[] = new Array(target.nodes.length)
   for (const [, t] of pairs) outputs[t] = new Float32Array(count * 4)
+  for (const { node } of followers) outputs[node] = new Float32Array(count * 4)
   const rootPositions = sourceRoot !== undefined && targetRoot !== undefined ? new Float32Array(count * 3) : null
   const sourceWorld = new Float64Array(source.nodes.length * 4)
   const targetWorld = new Float64Array(target.nodes.length * 4)
@@ -328,6 +364,24 @@ export function retargetClip(clip: Clip, source: Rig, target: Rig, options: Reta
     for (const i of targetNodes) {
       const parent = targetParent[i]!
       const s = sourceOf[i]!
+      if (s < 0 && followerMain[i]! >= 0) {
+        // A twist bone follows its main bone: W_main · (W_main_rest⁻¹ · W_twist_rest), in the parent's frame.
+        mulInto(targetWorld, followerMain[i]! * 4, followerOffsets, i * 4, world, 0)
+        if (parent < 0) local.set(world)
+        else {
+          inverseInto(targetWorld, parent * 4, inverse)
+          mulInto(inverse, 0, world, 0, local, 0)
+        }
+        targetWorld.set(world, i * 4)
+        const out = outputs[i]!
+        const o = k * 4
+        out[o] = local[0]!
+        out[o + 1] = local[1]!
+        out[o + 2] = local[2]!
+        out[o + 3] = local[3]!
+        keepHemisphere(out, k)
+        continue
+      }
       if (s < 0) {
         if (parent < 0) targetWorld.set(targetRestLocal.subarray(i * 4, i * 4 + 4), i * 4)
         else mulInto(targetWorld, parent * 4, targetRestLocal, i * 4, targetWorld, i * 4)
@@ -424,10 +478,10 @@ export function retargetClip(clip: Clip, source: Rig, target: Rig, options: Reta
       }
     }
   }
-  const rotations = new Map<number, Float32Array>(pairs.map(([, t]) => [t, outputs[t]!]))
+  const rotations = new Map<number, Float32Array>([...pairs.map(([, t]) => t), ...followers.map((f) => f.node)].map((t) => [t, outputs[t]!]))
 
   const tracks: ClipTrack[] = []
-  for (const [, t] of pairs) {
+  for (const t of [...pairs.map(([, node]) => node), ...followers.map((f) => f.node)]) {
     const values = rotations.get(t)!
     tracks.push(count === 1 ? { node: t, property: 'quaternion', size: 4, values, constant: true } : { node: t, property: 'quaternion', size: 4, values, constant: false })
   }
