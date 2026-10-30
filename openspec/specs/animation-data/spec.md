@@ -17,12 +17,12 @@ within the `clips` list. Keys that are not needed SHALL be ignored. A failure SH
 names the offending field path.
 
 #### Scenario: Real manifest
-- **WHEN** the Crepuscule default skin's `anim/manifest.json` is parsed
-- **THEN** the result has 139 clips, `contexts.menu.hiddenNodes` equal to `[392, 394, 395, 396]` and `contexts.menu.idle.clip` pointing at the clip named `UiStand1`
+- **WHEN** Shukra's `anim/manifest.json` is parsed
+- **THEN** the result has 70 clips, empty `hiddenNodes` for both contexts, an empty `stateHides`, and `contexts.menu.idle.clip` pointing at the clip named `UiStand1`
 
-#### Scenario: Manifest without hidden nodes
-- **WHEN** Stigmata's `anim/manifest.json` is parsed
-- **THEN** parsing succeeds with 113 clips, empty `hiddenNodes` for both contexts and an empty `stateHides`
+#### Scenario: Manifest with two fight levels
+- **WHEN** Pavo's `anim/manifest.json` is parsed
+- **THEN** parsing succeeds with 100 clips and the fight context's `levels` controllers
 
 #### Scenario: Optional and unknown keys
 - **WHEN** a manifest has no `contexts.fight.levels` and carries extra top-level keys
@@ -33,8 +33,12 @@ names the offending field path.
 - **THEN** parsing throws an error that contains `contexts.menu.hiddenNodes`
 
 #### Scenario: Clip index out of range
-- **WHEN** a controller state refers to clip index 500 in a manifest with 139 clips
+- **WHEN** a controller state refers to clip index 500 in a manifest with 70 clips
 - **THEN** parsing throws an error that names the controller and the state
+
+#### Scenario: Manifest without hidden nodes
+- **WHEN** Shukra's `anim/manifest.json` is parsed
+- **THEN** parsing succeeds with 70 clips, empty `hiddenNodes` for both contexts and an empty `stateHides`
 
 ### Requirement: Clip paths resolve against the manifest's folder
 A clip's `file` value in a manifest SHALL start with `anim/`. Its asset path SHALL be the folder of the
@@ -43,6 +47,10 @@ manifest that lists it, followed by the `file` value without that `anim/` prefix
 #### Scenario: Default skin
 - **WHEN** the manifest path is `anim/manifest.json` and the clip file is `anim/BaseLayer/Born.json`
 - **THEN** the asset path is `anim/BaseLayer/Born.json`
+
+#### Scenario: Other clip set
+- **WHEN** the manifest path is `anim-skins/r3qumd010031/manifest.json` and the clip file is `anim/BaseLayer/BoardAct0201.json`
+- **THEN** the asset path is `anim-skins/r3qumd010031/BaseLayer/BoardAct0201.json`
 
 #### Scenario: Unexpected prefix
 - **WHEN** a clip file does not start with `anim/`
@@ -100,8 +108,8 @@ The system SHALL load a manifest or a clip from a URL, check the response status
 decode it, and return the result. A failure SHALL throw an error that contains the URL and the reason.
 An aborted request SHALL be reported as an abort, not as a load failure. The `fetch` function SHALL be
 replaceable so the code can run without a browser. Asset paths that contain spaces or other characters
-that are not allowed in a URL path (Veritas' and Zero's `anim/Base Layer/…`) SHALL be encoded segment by
-segment when the URL is built, so they load.
+that are not allowed in a URL path (Pavo's `anim/Base Layer/…`, which holds its `StandAct0101` and Board actions) SHALL be encoded
+segment by segment when the URL is built, so they load.
 
 #### Scenario: Load failure
 - **WHEN** the server answers 404 for a clip URL
@@ -116,7 +124,7 @@ segment when the URL is built, so they load.
 - **THEN** manifests and clips load and decode in Node without a browser
 
 #### Scenario: Path with a space
-- **WHEN** Veritas' `BoardAct0201` (`anim/Base Layer/BoardAct0201.json`) is selected
+- **WHEN** Pavo's `BoardAct0201` (`anim/Base Layer/BoardAct0201.json`) is selected
 - **THEN** its URL ends in `anim/Base%20Layer/BoardAct0201.json` and the clip loads and plays
 
 ### Requirement: The module is framework-free
@@ -127,15 +135,14 @@ it can run in Node and be unit tested.
 - **WHEN** the imports of the files under `lib/anim/` are listed
 - **THEN** none of them import `three`, `vue`, `wxt` or use the `browser` global
 
-### Requirement: All shipped Crepuscule clips decode and agree with their models
-Every clip of the Crepuscule construct SHALL decode and agree with its model. For every manifest (default
-`anim/` and every `anim-skins/<id>/`) and every clip it lists, the clip file SHALL exist and decode
-without error, its decoded duration SHALL be within 0.02 s of the manifest's `duration`, every track's
-node index SHALL be a node of the manifest's target GLB, every morph weight target SHALL be inside the
+### Requirement: All shipped Qu clips decode and agree with their models
+Every clip of Shukra and Pavo SHALL decode and agree with its model. For every manifest (each frame's `anim/manifest.json`) and every
+clip it lists, the clip file SHALL exist and decode without error, its decoded duration SHALL be within 0.02 s of the manifest's
+`duration`, every track's node index SHALL be a node of the manifest's target GLB, every morph weight target SHALL be inside the
 morph target count of that node's mesh, and every animated quaternion SHALL have unit length.
 
 #### Scenario: Sweep
-- **WHEN** all 712 clips of the six manifests are decoded and compared with their target GLBs
+- **WHEN** all 170 clips of the two manifests (Shukra 70, Pavo 100) are decoded and compared with their target GLBs
 - **THEN** there are no failures and no mismatches
 
 #### Scenario: Data absent

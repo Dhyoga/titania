@@ -7,8 +7,9 @@ Playing the active construct's clips on its model in the side panel: the animati
 
 ### Requirement: Animation list per context
 The panel SHALL offer an animation list for the current context. The list SHALL hold clips only (there is no `Bind pose` item).
-It SHALL start with the shown frame's own groups, built from the shown skin's manifest, followed by the groups of every other frame
-(animation source) in frame-list order, each group label prefixed with the frame's name and a middle dot (`Stigmata · Board actions`).
+It SHALL start with the shown frame's own groups, built from the shown skin's manifest (none for a frame with no clip set of its own), followed by the
+groups of every other frame with a clip set (animation source) in frame-list order, each group label prefixed with the frame's name and a middle dot
+(`Pavo · Board actions`).
 In the Menu context a frame's groups SHALL be an `Idle` group with the menu idle clip and the menu controller's clips that are not
 Board actions, and a `Board actions` group with every `BoardAct*` clip of the menu controller. In the Fight context a frame's groups
 SHALL start from every clip referenced by the fight base controller and its `levels` controllers, grouped by name into Idle, Movement,
@@ -25,13 +26,33 @@ listed items of one frame share a name, each SHALL show its folder in brackets, 
 too. The field SHALL show a source item as `<Frame> · <name>`. Items whose clip has a paired voice line SHALL show a speaker glyph
 after the name, with the text "with voice" for screen readers.
 
+#### Scenario: Menu list on Shukra
+- **WHEN** the Menu context is shown for Shukra's Generic
+- **THEN** the list reads `Idle`: `StandAct0101`, `UiStand1`; `Board actions`: `BoardAct0201`, `BoardAct0202`, `BoardAct0203`, `BoardAct1001` … `BoardAct1007`; then `Pavo · Idle`, `Pavo · Board actions` with the same names
+
+#### Scenario: Fight list on Shukra
+- **WHEN** the Fight context is shown for Shukra's Generic
+- **THEN** Shukra's own groups read `Idle`: `Stand1`, `Stand2`, `Standchange`; `Movement`: `Run`, `Walk`; `Other`: `Born`, `Save`, `Win`, followed by `Pavo · Idle`, `Pavo · Movement` (`Run`, `Walk`), `Pavo · Level skills` (`LevelAttack14`) and `Pavo · Other` (`Born`, `Executioner01` … `Executioner05`, `Save`, `Win`)
+
+#### Scenario: Menu list on Erza
+- **WHEN** the Menu context is shown for Erza
+- **THEN** the list reads `Shukra · Idle` (`StandAct0101`, `UiStand1`), `Shukra · Board actions` (`BoardAct0201` … `BoardAct1007`), `Pavo · Idle`, `Pavo · Board actions`, and has no group without a prefix
+
+#### Scenario: Fight list on Erza
+- **WHEN** the Fight context is shown for Erza
+- **THEN** the list reads `Shukra · Idle` (`Stand1`, `Stand2`, `Standchange`), `Shukra · Movement` (`Run`, `Walk`), `Shukra · Other` (`Born`, `Save`, `Win`), `Pavo · Idle`, `Pavo · Movement`, `Pavo · Level skills` (`LevelAttack14`) and `Pavo · Other` (`Born`, `Executioner01` … `Executioner05`, `Save`, `Win`)
+
 #### Scenario: Field label of a source clip
-- **WHEN** Veritas' `Win` is selected on Crepuscule
-- **THEN** the field reads `Veritas · Win`
+- **WHEN** Pavo's `Win` is selected on Shukra
+- **THEN** the field reads `Pavo · Win`
 
 #### Scenario: Speaker glyph on paired Board actions
-- **WHEN** the Menu list is open for Crepuscule
-- **THEN** every Board action with a pairing in its own frame's `voices.json` shows the speaker glyph, and Veritas' `BoardAct0202` and `BoardAct0203` do not
+- **WHEN** the Menu list is open for Shukra
+- **THEN** every Board action with a pairing in its own frame's `voices.json` shows the speaker glyph, and a Board action without one does not
+
+#### Scenario: Speaker glyph on Erza
+- **WHEN** the Menu list is open for Erza
+- **THEN** every Board action with a pairing in its source frame's `voices.json` shows the speaker glyph
 
 ### Requirement: Default playback on open
 When a model has loaded and no earlier clip can be taken up (nothing is remembered, or the shown model's list lacks it), the panel SHALL be
@@ -80,13 +101,16 @@ model's original values.
 
 ### Requirement: Clips play in place
 When a manifest's root node (`rootNode`) is a node above the pelvis bone, its position track SHALL NOT be applied, so the character
-stays at its origin (Crepuscule's `Root`). When the root node is the pelvis bone `Bip001` itself (Stigmata, Veritas and Zero), its
-position track SHALL be applied, since it carries the pelvis height. Other tracks of the root node and all other nodes SHALL be
-applied.
+stays at its origin. When the root node is the pelvis bone `Bip001` itself (every clip of Shukra and Pavo), its position track SHALL be
+applied, since it carries the pelvis height. Other tracks of the root node and all other nodes SHALL be applied.
+
+#### Scenario: Root above the pelvis
+- **WHEN** a test clip whose `rootNode` is a node above `Bip001` carries that node 9.5 m away
+- **THEN** the root node keeps its bind position and the model stays inside the stage
 
 #### Scenario: Root is the pelvis
-- **WHEN** Stigmata's `Run` plays on Stigmata's model
-- **THEN** the pelvis moves up and down with the run at about 0.9 to 1.0 m and the feet stay on the floor
+- **WHEN** Pavo's `Run` plays on Pavo's model
+- **THEN** the pelvis moves up and down with the run near its rest height (0.968 m) and the feet stay on the floor
 
 ### Requirement: Play and pause
 The panel SHALL have a play/pause button that pauses and resumes the current clip at the current time.

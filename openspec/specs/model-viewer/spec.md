@@ -2,7 +2,9 @@
 
 ## Purpose
 Rendering the active construct's 3D model in the side panel stage card with three.js: loading, framing, orbit camera, lighting, on-demand rendering, error handling and resource cleanup. (Purpose TBD, synced from change add-model-viewer.)
+
 ## Requirements
+
 ### Requirement: Default skin is shown in the stage card
 When the panel opens, it SHALL load the Display model's GLB (see `display-mode`; by default the active construct's default skin) from
 `/<constructId>/models/<skin>.glb` and render it inside the stage card, upright, facing the camera. In Playground the default framing
@@ -10,10 +12,10 @@ SHALL show the whole body with some headroom above the head; Display uses its ow
 
 #### Scenario: Model appears
 - **WHEN** the side panel opens with no Display model saved and is switched to Playground
-- **THEN** the stage card shows the Crepuscule default model from the front, feet and head both inside the card, over the stage gradient
+- **THEN** the stage card shows Shukra's Generic (`/shukra/models/r3qumd010011.glb`) from the front, feet and head both inside the card, over the stage gradient
 
 #### Scenario: Framing follows the model
-- **WHEN** a different model (for example the smaller chibi model) is loaded into the viewer in Playground
+- **WHEN** a different model is loaded into the viewer in Playground
 - **THEN** the camera is framed from that model's bounds without any construct-specific numbers
 
 ### Requirement: Manifest hidden nodes are not rendered
@@ -194,7 +196,7 @@ Every mesh of the shown model, and its outline, SHALL be drawn whatever the came
 SHALL be skipped because of a bounding volume that does not follow the animation.
 
 #### Scenario: Face close-up during a Board action
-- **WHEN** Crepuscule's Sunlit Tides plays `BoardAct0201`, paused at 23.6 s, with the camera at its closest on the face and turned around it
+- **WHEN** Shukra plays `BoardAct0201`, paused mid-clip, with the camera at its closest on the face and turned around it
 - **THEN** the eyes and the face stay drawn at every angle
 
 ### Requirement: Default framing fits the body's height to the whole canvas
@@ -208,7 +210,7 @@ or the model. A camera the user has moved SHALL keep its position when the canva
 - **THEN** the crown is within the top 18 % of the canvas, the feet are within the bottom 18 % (a bar laid over the bottom may cover them), and the torso is inside the width
 
 #### Scenario: Every frame
-- **WHEN** the default skin of each of the four frames is shown at the default framing at 320, 387 and 600 px wide
+- **WHEN** the default skin of each of the two frames is shown at the default framing at 320, 387 and 600 px wide
 - **THEN** each body fills at least 55 % of the canvas height and its torso is inside the width
 
 #### Scenario: A bar over the bottom
@@ -218,3 +220,20 @@ or the model. A camera the user has moved SHALL keep its position when the canva
 #### Scenario: Panel resized
 - **WHEN** the panel is resized and the camera was not moved by the user
 - **THEN** the default framing is recomputed for the new size; a camera the user moved stays where it is
+
+### Requirement: Erza is framed from her body
+The default framing of Erza SHALL be computed from her body's visible meshes, as for every model: her height fits the canvas with the usual margin, limited by her
+width where the panel is narrow, and no prop far from her body is included. Her bind pose is a T-pose, so the width limit SHALL be checked against the clips that play
+on her; the figures measured for her are recorded in `AGENTS.md`, not here.
+
+#### Scenario: Tall panel
+- **WHEN** Erza is shown at 387 × 1045 px with no camera saved
+- **THEN** her head and feet are inside the canvas with room above and below, and she is centred
+
+#### Scenario: Wide panel
+- **WHEN** Erza is shown at 600 × 800 px
+- **THEN** the height decides the framing and her whole body is in view
+
+#### Scenario: Narrow panel
+- **WHEN** Erza is shown at 320 px wide while `Shukra · BoardAct0201` plays
+- **THEN** her head is in view and her arms do not leave the canvas by more than the zoom-out the user can make (the same cost accepted for Qu's frames)

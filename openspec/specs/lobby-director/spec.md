@@ -13,11 +13,11 @@ never shown in its bind pose first. A voice line SHALL start without a user gest
 clock's start window the action SHALL run silently (see `board-voice`).
 
 #### Scenario: Open the panel
-- **WHEN** the side panel opens on Crepuscule Generic - Final
+- **WHEN** the side panel opens on Shukra's Generic with a non-empty pool
 - **THEN** a Board action of the pool plays, its voice line is heard, and its caption shows when captions are on
 
 #### Scenario: Another Display model
-- **WHEN** a different skin is chosen in the Display model popover
+- **WHEN** Pavo's Generic is chosen in the Display model popover
 - **THEN** the new model is shown and starts a Board action
 
 #### Scenario: Back from Playground
@@ -43,25 +43,31 @@ clock's start window the action SHALL run silently (see `board-voice`).
 ### Requirement: The action pool
 The pool SHALL be every Board action (a Menu clip whose name starts with `BoardAct`) of the Display frame's own clips that has a voice line in
 that frame's `voices.json`, always, plus the borrowed Board actions the user has chosen for that Display frame (see `display-mode`, "Display
-animations"), each from another frame's Generic clip set (with that frame's extras) and with a voice line in that frame's `voices.json`,
-borrowed as in Playground. The Display frame's own clips SHALL include its extras that the shown skin lists as the frame's own (Solitary
-Dream's `BoardAct10021` and `BoardAct10022` on Stigmata's other skins). A clip without a voice line SHALL NOT be in the pool. When the user
-has made no choice for the Display frame, the borrowed actions SHALL be its default: every voiced Board action of each frame in its
-construct configuration's `lobby.actionFrom` (Crepuscule: Stigmata and Veritas; the other frames: none). Any frame, Zero included, SHALL be
-choosable as a lender. Actions SHALL be taken from one shuffled bag over the whole pool: every action plays once before any plays twice, and
-the first action of a new bag SHALL NOT be the last one of the previous bag. When the pool is empty (the Display frame's data could not be
-read), Display SHALL stay in idle and a tap SHALL start nothing.
+animations"), each from the other frame's Generic clip set and with a voice line in that frame's `voices.json`, borrowed as in Playground. A
+clip without a voice line SHALL NOT be in the pool. When the user has made no choice for the Display frame, the borrowed actions SHALL be its
+default: every voiced Board action of each frame in its construct configuration's `lobby.actionFrom` (Shukra: Pavo; Pavo: Shukra). Actions
+SHALL be taken from one shuffled bag over the whole pool: every action plays once before any plays twice, and the first action of a new bag
+SHALL NOT be the last one of the previous bag. When the pool is empty (the Display frame's data could not be read and nothing is borrowed),
+Display SHALL stay in idle and a tap SHALL start nothing.
+
+#### Scenario: Shukra's default pool
+- **WHEN** Display shows Shukra, no choice is saved for Shukra, and all ten Board actions (`0201`–`0203`, `1001`–`1007`) are paired for both frames
+- **THEN** the pool holds twenty actions: Shukra's ten and Pavo's ten
+
+#### Scenario: Nothing borrowed
+- **WHEN** the user has cleared Pavo's section for Shukra
+- **THEN** the pool holds Shukra's voiced Board actions only
 
 #### Scenario: No line, no pool
-- **WHEN** Display shows Night Sonata
-- **THEN** `BoardAct0204` and `BoardAct0205` (no voice line) are never played
+- **WHEN** Pavo's `voice_pairings.json` entry has no `BoardAct0202`
+- **THEN** `Pavo · BoardAct0202` is in neither frame's pool and is not offered in the Animations popover
 
 #### Scenario: No repeats back to back
-- **WHEN** the actions are started 60 times in a row on Crepuscule with the default pool
-- **THEN** no action follows itself, and each block of thirty starts (the first to the thirtieth, the thirty-first to the sixtieth) holds each action once
+- **WHEN** the actions are started 60 times in a row on Shukra with a pool of twenty
+- **THEN** no action follows itself, and each block of twenty starts (the first to the twentieth, the twenty-first to the fortieth, and so on) holds each action once
 
 #### Scenario: Empty pool
-- **WHEN** the Display frame has no `voices.json` and borrows nothing
+- **WHEN** neither frame has a `voices.json`
 - **THEN** Display idles, and tapping starts nothing
 
 ### Requirement: A tap starts an action and interrupts
@@ -127,20 +133,24 @@ stay in idle until the next tap. The action SHALL end with the loop off whatever
 - **THEN** the action still ends and the model idles
 
 ### Requirement: Idle is varied
-In idle Display SHALL play `UiStand1` of the shown skin's own clip set (when it has it), always, and the `UiStand1` of every other frame the
-user has chosen for the Display frame (or, with no choice saved, of every frame in its construct configuration's `lobby.idleFrom`:
-Crepuscule: Stigmata; the others: none), borrowed as in Playground, the own clip taking 75 % of the picks and the borrowed ones together 25 %
-(split evenly over them); when nothing is borrowed, the own clip alone. `StandAct0101` SHALL NOT be played in Display, on any frame, own or
+In idle Display SHALL play `UiStand1` of the shown skin's own clip set (when it has it), always, and the `UiStand1` of the other frame when
+the user has chosen it for the Display frame (or, with no choice saved, of every frame in its construct configuration's `lobby.idleFrom`:
+Shukra: Pavo; Pavo: Shukra), borrowed as in Playground, the own clip taking 75 % of the picks and the borrowed ones together 25 % (split
+evenly over them); when nothing is borrowed, the own clip alone. `StandAct0101` SHALL NOT be played in Display, on any frame, own or
 borrowed, and SHALL NOT be offered. Repeats are allowed. A chosen idle SHALL play whole loops for at least 10 s (the number of loops is the
 smallest that reaches 10 s, to within 0.05 s), and the next idle SHALL be chosen at the end of its last loop; a different one crossfades in
 over 0.25 s, the same one just goes on looping. The meshes shown follow the shown skin's rule for a clip of that name.
 
 #### Scenario: Dwell
-- **WHEN** an idle of 6 s is chosen
+- **WHEN** Pavo's `UiStand1` (6.0 s) is chosen
 - **THEN** it plays twice (12 s) before the next choice
 
+#### Scenario: Long idle
+- **WHEN** Shukra's `UiStand1` (17.0 s) is chosen
+- **THEN** it plays once before the next choice
+
 #### Scenario: Another idle
-- **WHEN** an idle ends its last loop and another source's `UiStand1` is chosen (Stigmata's after Crepuscule's own, or the reverse)
+- **WHEN** an idle ends its last loop and the other frame's `UiStand1` is chosen
 - **THEN** it crossfades in from the start, with no frame in bind pose
 
 #### Scenario: Same idle again
@@ -148,16 +158,16 @@ over 0.25 s, the same one just goes on looping. The meshes shown follow the show
 - **THEN** it keeps looping with no restart
 
 #### Scenario: Share of borrowed idles
-- **WHEN** 400 idles are chosen on Crepuscule with the default choice
-- **THEN** between 20 % and 30 % of them are Stigmata's
+- **WHEN** 400 idles are chosen on Shukra with the default choice
+- **THEN** between 20 % and 30 % of them are Pavo's
 
 #### Scenario: No StandAct0101
-- **WHEN** 400 idles are chosen on any frame with any choice
+- **WHEN** 400 idles are chosen on either frame with any choice
 - **THEN** none of them is `StandAct0101`, own or borrowed
 
 #### Scenario: Own idle alone
-- **WHEN** Display shows Stigmata, Veritas or Zero and no idle is chosen for that frame
-- **THEN** the idle is the model's own `UiStand1`, which just goes on looping at the end of each dwell
+- **WHEN** the user has cleared Pavo's `UiStand1` for Shukra
+- **THEN** the idle is Shukra's own `UiStand1`, which just goes on looping at the end of each dwell
 
 ### Requirement: The next action is prepared in advance
 While Display idles or plays an action, the next action of the bag SHALL be prepared: its clip built and cached in the viewer, and its voice
@@ -232,6 +242,10 @@ its voice line and caption come from the frame it was borrowed from, the meshes 
 and hair and cloth hold the mean pose of the shown model's idle. It SHALL be prepared in advance like an own action (its lender's rig read
 and its clip retargeted and cached), and its crossfades and end follow `lobby-director`'s other requirements.
 
+#### Scenario: Pavo's action on Shukra
+- **WHEN** Display shows Shukra and a paired Pavo Board action is chosen
+- **THEN** it plays with Pavo's line and its caption, on Shukra's body
+
 #### Scenario: Prepared like an own action
 - **WHEN** a borrowed action is next in the bag and Display has idled for 3 s
 - **THEN** a tap starts it without any new request for its clip, its lender's rig or its line
@@ -246,12 +260,12 @@ and the idle list for the session, and carry on with the others. When a borrowed
 does not stop the lobby" applies.
 
 #### Scenario: Lender without clips
-- **WHEN** Stigmata's manifest cannot be fetched
-- **THEN** Display on Crepuscule plays its own clips and Veritas' only, and a warning is logged
+- **WHEN** Pavo's manifest cannot be fetched
+- **THEN** Display on Shukra plays its own clips only, and a warning is logged
 
 #### Scenario: Lender without lines
-- **WHEN** Veritas' `voices.json` cannot be read
-- **THEN** none of Veritas' actions is in the pool, a warning is logged, and the rest of the pool is unchanged
+- **WHEN** Pavo's `voices.json` cannot be read
+- **THEN** none of Pavo's actions is in Shukra's pool, a warning is logged, and the rest of the pool is unchanged
 
 ### Requirement: The pool follows the choice while Display runs
 Display SHALL use the new pool and idles without restarting when the chosen animations of the Display frame change while it runs (from
@@ -261,12 +275,12 @@ SHALL NOT come right after the last action taken; the next idle pick SHALL use t
 prepared in advance as before.
 
 #### Scenario: Remove while playing
-- **WHEN** Stigmata's `BoardAct0201` plays on Crepuscule and the user clears Stigmata in the popover
-- **THEN** it plays to its end, the lobby idles, and no Stigmata action starts afterwards
+- **WHEN** Pavo's `BoardAct0201` plays on Shukra and the user clears Pavo in the popover
+- **THEN** it plays to its end, the lobby idles, and no Pavo action starts afterwards
 
 #### Scenario: Add while idling
-- **WHEN** Display idles on Crepuscule and the user checks Zero's `BoardAct1004`
-- **THEN** the idle goes on, and Zero's `BoardAct1004` starts within the next bag's worth of taps
+- **WHEN** Display idles on Shukra with Pavo cleared and the user checks Pavo's `BoardAct1004`
+- **THEN** the idle goes on, and Pavo's `BoardAct1004` starts within the next bag's worth of taps
 
 #### Scenario: Prepared action removed
 - **WHEN** the prepared next action is removed from the pool

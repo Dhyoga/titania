@@ -34,7 +34,7 @@ follow animation) of Playground. What Display plays is decided by the lobby dire
 - **THEN** the panel shows the stage edge to edge with only the menu icon over it
 
 #### Scenario: Idle
-- **WHEN** the panel is in Display on Crepuscule Generic - Final and no action is playing
+- **WHEN** the panel is in Display on Shukra's Generic and no action is playing
 - **THEN** one of the model's idle clips plays looping (see `lobby-director`)
 
 #### Scenario: Shared settings
@@ -52,12 +52,12 @@ skin and panel size. Follow animation SHALL keep working in Display. The camera 
 - **THEN** the camera does not move
 
 #### Scenario: Built-in bust framing
-- **WHEN** no Display camera is saved and Crepuscule Generic - Final is shown in a 381 px wide panel
-- **THEN** the stage shows her from the top of the head to the upper thighs, with the face in the upper third, as in the user's reference screenshot
+- **WHEN** no Display camera is saved and Shukra's Generic is shown in a 381 px wide panel
+- **THEN** the stage shows her from the top of the head to the upper thighs, with the face in the upper third
 
 #### Scenario: Other frame
-- **WHEN** no Display camera is saved and Veritas is the Display model
-- **THEN** Veritas is framed from the crown to the upper thighs too
+- **WHEN** no Display camera is saved and Pavo is the Display model
+- **THEN** Pavo is framed from the crown to the upper thighs too
 
 ### Requirement: Adjust camera
 The Display menu SHALL have an "Adjust camera" button. While adjusting, orbit, zoom and pan SHALL work as in Playground and a bar at the
@@ -79,18 +79,18 @@ Playground default camera SHALL NOT change.
 - **THEN** the camera shows the built-in bust framing, now and on the next open
 
 ### Requirement: Display model
-The Display menu SHALL have a "Model" button that opens a popover listing the four frames and, for the chosen frame, its skins as
-thumbnails (each skin's name is its tooltip and accessible name, and the shown skin's name is written under them), without the dorm chibis. Choosing a skin SHALL show it in Display at once and SHALL save it as the Display
-model. The default Display model SHALL be Crepuscule, Generic - Final. A saved Display model that no longer exists or is a chibi SHALL be
-replaced by the default without an error.
+The Display menu SHALL have a "Model" button that opens a popover listing the frames and, for the chosen frame, its skins as thumbnails
+(each skin's name is its tooltip and accessible name, and the shown skin's name is written under them). Choosing a skin SHALL show it in
+Display at once and SHALL save it as the Display model. The default Display model SHALL be Shukra, Generic. A saved Display model that no
+longer exists SHALL be replaced by the default without an error.
 
 #### Scenario: Choose a Display model
-- **WHEN** the Model popover is opened, Stigmata is chosen and then Solitary Dream
-- **THEN** Display shows Stigmata Solitary Dream, and the next open of the panel shows it too
+- **WHEN** the Model popover is opened, Pavo is chosen and then its Generic
+- **THEN** Display shows Pavo's Generic, and the next open of the panel shows it too
 
 #### Scenario: Unknown saved model
-- **WHEN** the saved Display model names a skin id that no frame has
-- **THEN** the panel opens on Crepuscule Generic - Final
+- **WHEN** the saved Display model names a skin id that no frame has (for example a Bianca skin from an imported PGR preferences file)
+- **THEN** the panel opens on Shukra's Generic
 
 ### Requirement: Playground follows the Display model
 Entering Playground SHALL keep the model Display shows, with the Playground camera (the saved default camera, else the built-in default
@@ -98,12 +98,12 @@ framing). A frame or skin chosen in Playground SHALL be shown there but SHALL NO
 Display model, loading it only when Playground showed another one, and SHALL start Display in idle (see `lobby-director`: no new Board action).
 
 #### Scenario: Enter Playground
-- **WHEN** Display shows Night Sonata and the user switches to Playground
-- **THEN** the header reads Crepuscule, the skin strip marks Night Sonata, the model is not loaded again and the camera shows the Playground framing
+- **WHEN** Display shows Pavo's Generic and the user switches to Playground
+- **THEN** the header reads Pavo, the skin strip marks Pavo's Generic, the model is not loaded again and the camera shows the Playground framing
 
 #### Scenario: Temporary choice
-- **WHEN** in Playground the user picks Veritas Grace and switches back to Display
-- **THEN** Display shows the Display model again and the saved Display model is unchanged
+- **WHEN** Display shows Shukra, in Playground the user picks Pavo and switches back to Display
+- **THEN** Display shows Shukra again and the saved Display model is unchanged
 
 ### Requirement: Switching modes
 The Playground header SHALL have a "Display" button on its right; the Display menu SHALL have a "Playground" button. Each SHALL switch to
@@ -141,40 +141,66 @@ Display. The same exceptions as in Playground SHALL apply (modifier keys, text f
 
 ### Requirement: Display animations
 The Display menu SHALL have an "Animations" button, between Model and Adjust camera, that opens a popover listing what Display may play on
-the Display model, in sections by frame: the Display frame first, then the other frames in the frame picker's order, Zero included. Each
-section SHALL list the frame's `UiStand1` as its idle and every Board action it has with a voice line (the voice line's title, the clip
-name and its length), and SHALL NOT list a clip without a voice line or `StandAct0101`. The Display frame's own rows SHALL be checked and
-SHALL NOT be uncheckable. Another frame's rows SHALL be checkable one by one, and its section SHALL have a checkbox that checks or clears
-all of its rows and shows a mixed state when some are checked. Each change SHALL be saved at once for the Display frame and SHALL apply
-to Display while it runs (see `lobby-director`). "Use default" SHALL forget the Display frame's choice and show its default. Sections SHALL start folded, except one whose
-animations are partly chosen, and the user can fold and unfold them. A frame whose clips or voice lines could not be read SHALL be shown
-disabled with a note. The popover SHALL fit a 320 px panel without horizontal
-scrolling and its list SHALL scroll when it is taller than the stage. A press inside the popover SHALL NOT be a tap on the stage.
+the Display model, in sections by frame: the Display frame first, then the other frames in the frame picker's order. Each section SHALL
+list the frame's `UiStand1` as its idle and every Board action it has with a voice line (the voice line's title, the clip name and its
+length), and SHALL NOT list a clip without a voice line or `StandAct0101`. The Display frame's own rows SHALL be checked and SHALL NOT be
+uncheckable. Another frame's rows SHALL be checkable one by one, and its section SHALL have a checkbox that checks or clears all of its rows
+and shows a mixed state when some are checked. Each change SHALL be saved at once for the Display frame and SHALL apply to Display while it
+runs (see `lobby-director`). "Use default" SHALL forget the Display frame's choice and show its default. Sections SHALL start folded, except
+one whose animations are partly chosen, and the user can fold and unfold them. A frame whose clips or voice lines could not be read SHALL be
+shown disabled with a note. The popover SHALL fit a 320 px panel without horizontal scrolling and its list SHALL scroll when it is taller
+than the stage. A press inside the popover SHALL NOT be a tap on the stage.
 
 #### Scenario: Own animations locked
-- **WHEN** the Animations popover is opened with Crepuscule as the Display model and Crepuscule's section is unfolded
-- **THEN** it lists `UiStand1` and its ten Board actions, all checked and disabled
+- **WHEN** the Animations popover is opened with Shukra as the Display model and Shukra's section is unfolded
+- **THEN** it lists `UiStand1` and every voiced Board action of Shukra, all checked and disabled
 
 #### Scenario: No silent clips
-- **WHEN** the popover lists Veritas
-- **THEN** it lists Veritas' `UiStand1` and eight Board actions, without `BoardAct0202` and `BoardAct0203`
+- **WHEN** Pavo's `voice_pairings.json` entry has no `BoardAct0202` and the popover lists Pavo
+- **THEN** it lists Pavo's `UiStand1` and its voiced Board actions, without `BoardAct0202`
 
-#### Scenario: Choose a whole frame
-- **WHEN** Zero's section checkbox is pressed on Crepuscule
-- **THEN** Zero's idle and ten Board actions are checked, saved for Crepuscule, and Zero's actions join Display's pool
+#### Scenario: Default on Shukra
+- **WHEN** the popover is opened on Shukra with no choice saved
+- **THEN** every row of Pavo's section is checked (Shukra's default borrows Pavo's voiced Board actions and idle)
 
 #### Scenario: Mixed frame
-- **WHEN** one of Stigmata's rows is cleared
-- **THEN** Stigmata's section checkbox shows the mixed state and the row's action no longer starts in Display
+- **WHEN** one of Pavo's rows is cleared on Shukra
+- **THEN** Pavo's section checkbox shows the mixed state and the row's action no longer starts in Display
 
 #### Scenario: Per Display frame
-- **WHEN** Zero is chosen for Crepuscule and the Display model is then changed to Veritas
-- **THEN** the popover shows Veritas' own rows locked and Veritas' choice (its default: nothing borrowed), and Crepuscule's choice is kept for when it is the Display model again
+- **WHEN** Pavo's section is cleared for Shukra and the Display model is then changed to Pavo
+- **THEN** the popover shows Pavo's own rows locked and Pavo's choice (its default: all of Shukra's), and Shukra's choice is kept for when it is the Display model again
 
 #### Scenario: Use default
-- **WHEN** "Use default" is pressed on Crepuscule after changes
-- **THEN** Stigmata's and Veritas' actions, Stigmata's idle and nothing of Zero are checked, and Display's pool is the default again
+- **WHEN** "Use default" is pressed on Shukra after changes
+- **THEN** every row of Pavo's section is checked again, and Display's pool is the default again
 
 #### Scenario: Narrow panel
 - **WHEN** the panel is 320 px wide
 - **THEN** the Display menu's five buttons and its icon fit on one line, and the popover fits without horizontal scrolling
+
+#### Scenario: Choose a whole frame
+- **WHEN** Pavo's section checkbox is pressed on Shukra
+- **THEN** Pavo's idle and ten Board actions are checked, saved for Shukra, and Pavo's actions join Display's pool
+
+### Requirement: A frame without clips of its own is not offered in Display
+A frame that has no clip set of its own (Erza) SHALL NOT be a Display model and SHALL NOT be a section of the Display menu's Animations popover.
+The Model popover SHALL list the frames that can be shown in Display only. A saved Display model that names such a frame SHALL be replaced by the
+default (Shukra's Generic) without an error. The lobby's lenders and idles SHALL come only from frames that have a clip set. In Playground the frame
+SHALL be shown as any other.
+
+#### Scenario: Model popover
+- **WHEN** the Display menu's Model popover is opened
+- **THEN** it lists Shukra and Pavo, and not Erza
+
+#### Scenario: Animations popover
+- **WHEN** the Animations popover is opened with Shukra as the Display model
+- **THEN** it has sections for Shukra and Pavo only
+
+#### Scenario: Saved Erza
+- **WHEN** the stored Display model is Erza (an edited record or an import)
+- **THEN** the panel opens on Shukra's Generic without an error, and the stored value is kept
+
+#### Scenario: Playground
+- **WHEN** Erza is chosen in Playground and the panel is switched to Display
+- **THEN** Display shows the saved Display model (Shukra's Generic by default) and the saved Display model is unchanged

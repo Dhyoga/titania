@@ -11,9 +11,13 @@ The panel SHALL read the `voices.json` of every frame whose clips the list offer
 assets. Pairings SHALL come from data only; no clip or file name SHALL be hard-coded. If a frame's `voices.json` cannot be read, no clip
 of that frame SHALL have a pairing and the rest of the panel SHALL work as before.
 
+#### Scenario: Shukra pairings
+- **WHEN** Shukra's Menu list is built
+- **THEN** each of its Board actions that `voice_pairings.json` pairs has a pairing with a `shukra/voices_ja/v_qus_*.mp3` file, and the others have none
+
 #### Scenario: Source frame pairing
-- **WHEN** Crepuscule's Menu list is built and Stigmata's `voices.json` pairs `BoardAct0201` with `v_biankasuper_9_6.mp3`
-- **THEN** `Stigmata · BoardAct0201` is paired with `stigmata/voices_ja/v_biankasuper_9_6.mp3`, and Crepuscule's own `BoardAct0201` keeps its own line
+- **WHEN** Shukra's Menu list is built and Pavo's `voices.json` pairs `BoardAct0201` with one of Pavo's files
+- **THEN** `Pavo · BoardAct0201` is paired with that file under `pavo/voices_ja/`, and Shukra's own `BoardAct0201` keeps its own line
 
 #### Scenario: voices.json missing
 - **WHEN** a frame's `voices.json` cannot be fetched
@@ -24,8 +28,8 @@ Selecting a paired clip in the Menu context SHALL start the clip and its audio t
 in the Fight context SHALL NOT play voice lines.
 
 #### Scenario: Select a Board action
-- **WHEN** `BoardAct0201` is selected
-- **THEN** the clip starts at 0 and `v_biankasups_009_12` starts playing at its beginning at the same moment
+- **WHEN** a paired Board action of Shukra is selected
+- **THEN** the clip starts at 0 and its paired `v_qus_*` line starts playing at its beginning at the same moment
 
 ### Requirement: The timeline is the longer of clip and audio
 A paired clip SHALL play on a timeline whose length is the longer of the clip's duration and the decoded
@@ -164,8 +168,8 @@ audio could not be loaded. The caption SHALL follow the voice timeline when seek
 SHALL NOT hide it.
 
 #### Scenario: Caption during a line
-- **WHEN** `BoardAct0201` plays on Crepuscule and its voice is heard
-- **THEN** a caption above the toolbar shows the current sentence of "Like roses and thorns, forever entwined…", and the next cue replaces it as the line goes on
+- **WHEN** a paired Board action plays on Shukra and its voice is heard
+- **THEN** a caption above the toolbar shows the current sentence of the line's English text, and the next cue replaces it as the line goes on
 
 #### Scenario: Before the voice and after it
 - **WHEN** a Board action starts and its line begins after about 2 s of silence, and later the line ends while the clip continues

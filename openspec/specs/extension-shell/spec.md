@@ -30,8 +30,8 @@ the stage. The header and the skin area SHALL be hidden while Focus is on (see `
 - **THEN** the stage fills the whole panel with no header and no skin strip
 
 #### Scenario: Playground
-- **WHEN** the panel is switched to Playground with Crepuscule shown
-- **THEN** the header reads "Crepuscule", the stage fills the space between the header and the skin strip, and no area of the panel below the skin strip is empty
+- **WHEN** the panel is switched to Playground with Shukra shown
+- **THEN** the header reads "Shukra", the stage fills the space between the header and the skin strip, and no area of the panel below the skin strip is empty
 
 #### Scenario: Tall panel
 - **WHEN** the side panel is 1045 px tall and in Playground
@@ -60,9 +60,22 @@ paths from there; components SHALL receive the shown construct through props or 
 naming it.
 
 #### Scenario: No hard-coded construct in components
-- **WHEN** the source under `components/` and `entrypoints/` is searched for `crepuscule`, `stigmata`, `veritas` and `zero`
+- **WHEN** the source under `components/` and `entrypoints/` is searched for `shukra`, `pavo`, `crepuscule`, `stigmata`, `veritas` and `zero`
 - **THEN** there are no matches
 
 #### Scenario: Build reads the same list
 - **WHEN** a frame is removed from the list in `lib/constructs/` and the extension is built
 - **THEN** that frame is neither offered by the picker nor served
+
+### Requirement: The extension is named Titania
+The extension's manifest `name` SHALL be `Titania: Fairy Tail Companion`, its `description` SHALL say that it is a side panel companion
+for Erza Scarlet with 3D models, animations and voice lines, and the side panel page's `<title>` SHALL be `Titania: Fairy Tail Companion`.
+The package name SHALL be `titania-fairy-tail-companion`. No user-visible text of the extension SHALL name Bianca or Gray Raven Companion.
+
+#### Scenario: Built manifest
+- **WHEN** `pnpm build` finishes and `dist/chrome-mv3/manifest.json` is read
+- **THEN** its `name` is `Titania: Fairy Tail Companion`
+
+#### Scenario: No Bianca branding
+- **WHEN** the source under `components/`, `entrypoints/`, `composables/` and `wxt.config.ts` is searched for `Bianca` and `Gray Raven Companion`
+- **THEN** there are no matches
